@@ -27,6 +27,7 @@ opentelemetry-instrumentation-fastapi = "^0.60b1"
 opentelemetry-instrumentation-requests = "^0.60b1"
 requests = "^2.33.1"
 statsd = "^4.0.1"
+cryptography = ">=42.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.2"
