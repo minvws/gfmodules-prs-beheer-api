@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app import container
 from app.config import get_config
 from app.middleware.stats import StatsdMiddleware
+from app.routers.client import router as client_router
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
 from app.routers.organization import router as organization_router
@@ -70,7 +71,7 @@ def setup_fastapi() -> FastAPI:
 
     container.configure()
 
-    routers = [default_router, health_router, organization_router]
+    routers = [default_router, health_router, organization_router, client_router]
 
     for router in routers:
         fastapi.include_router(router)
