@@ -15,12 +15,10 @@ from app.services.organization import OrganizationService
 @pytest.fixture()
 def database() -> Generator[Database, Any, None]:
     config_database = ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[])
-    try:
-        db = Database(config_database=config_database)
-        db.generate_tables()
-        yield db
-    except Exception as e:
-        raise e
+    db = Database(config_database=config_database)
+    db.generate_tables()
+    yield db
+    db.engine.dispose()
 
 
 @pytest.fixture()
