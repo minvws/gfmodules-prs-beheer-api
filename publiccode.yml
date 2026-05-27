@@ -1,0 +1,69 @@
+publiccodeYmlVersion: "0.5"
+name: Generieke Functies PRS Beheer API
+url: https://github.com/minvws/gfmodules-prs-beheer-api
+platforms:
+  - web
+categories:
+  - application-development
+developmentStatus: development
+softwareType: standalone/backend
+intendedAudience:
+  countries:
+    - NL
+  scope:
+    - government
+    - healthcare
+
+description:
+  nl:
+    shortDescription: >-
+      Beheer-API voor het registreren en administreren van organisaties en
+      hun clients binnen het PRS-systeem.
+    longDescription: |
+      De PRS Beheer API is onderdeel van het 'Generieke Functies, lokalisatie
+      en addressering' project van het Ministerie van Volksgezondheid, Welzijn
+      en Sport. De applicatie beheert de registratie en administratie van
+      organisaties (geïdentificeerd via OIN) en hun gekoppelde clients die
+      deelnemen aan het PRS-systeem. Organisaties kunnen worden geregistreerd
+      met een optioneel mTLS-clientcertificaat. Clients worden geregistreerd
+      onder een organisatie en zijn eveneens voorzien van een OIN.
+    features:
+      - Registratie en beheer van organisaties op basis van OIN
+      - Registratie en beheer van clients gekoppeld aan een organisatie
+      - Ondersteuning voor mTLS-clientcertificaten per organisatie
+  en:
+    shortDescription: >-
+      Management API for registering and administering organisations and their
+      clients within the PRS system.
+    longDescription: |
+      The PRS Beheer API is part of the 'Generieke Functies, lokalisatie en
+      addressering' project of the Ministry of Health, Welfare and Sport. The
+      application manages the registration and administration of organisations
+      (identified by OIN) and their associated clients participating in the
+      PRS system. Organisations can be registered with an optional mTLS client
+      certificate. Clients are registered under an organisation and are
+      similarly identified by OIN.
+    features:
+      - Registration and management of organisations identified by OIN
+      - Registration and management of clients linked to an organisation
+      - mTLS client certificate support per organisation
+
+legal:
+  license: EUPL-1.2
+  mainCopyrightOwner: Ministerie van Volksgezondheid, Welzijn en Sport
+
+maintenance:
+  type: internal
+  contacts:
+    - name: iRealisatie - Team Generieke Functies
+      email: maintainer@irealisatie.nl
+      affiliation: Ministerie van Volksgezondheid, Welzijn en Sport
+
+organisation:
+  uri: https://www.rijksoverheid.nl/ministeries/ministerie-van-volksgezondheid-welzijn-en-sport
+  name: Ministerie van Volksgezondheid, Welzijn en Sport
+
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
