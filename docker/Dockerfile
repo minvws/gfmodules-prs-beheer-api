@@ -2,11 +2,12 @@
 # syntax directive is used to enable Docker BuildKit
 
 ARG PYTHON_VERSION=3.14
+ARG VIRTUAL_ENV_PATH="/opt/app/docker-venv"
 
 FROM python:${PYTHON_VERSION}-slim AS base
 
 ARG PROJECT_DIR="/src"
-ARG VIRTUAL_ENV_PATH="/opt/app/docker-venv"
+ARG VIRTUAL_ENV_PATH
 ARG APP_USER="app"
 ARG APP_GROUP="app"
 ARG NEW_UID
@@ -39,6 +40,8 @@ WORKDIR ${PROJECT_DIR}
 # Builder base stage for compilation and dependency installation
 FROM base AS builder-base
 
+ARG VIRTUAL_ENV_PATH
+
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
@@ -64,24 +67,19 @@ WORKDIR ${PROJECT_DIR}
 COPY ./pyproject.toml ./poetry.lock ./
 
 ENV POETRY_CACHE_DIR=/tmp/poetry-cache \
-    POETRY_VIRTUALENVS_CREATE=false
+    POETRY_VIRTUALENVS_CREATE=false \
+    VIRTUAL_ENV="${VIRTUAL_ENV_PATH}"
+
+ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 # Production dependencies builder (main deps only)
 FROM builder-base AS builder-runtime
-
-ARG VIRTUAL_ENV_PATH
-ENV VIRTUAL_ENV="${VIRTUAL_ENV_PATH}"
-ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 RUN --mount=type=cache,target=${POETRY_CACHE_DIR} \
     poetry install --no-root --no-interaction --only main
 
 # Development dependencies builder (full deps, poetry available)
 FROM builder-base AS builder-dev
-
-ARG VIRTUAL_ENV_PATH
-ENV VIRTUAL_ENV="${VIRTUAL_ENV_PATH}"
-ENV PATH="${VIRTUAL_ENV}/bin:$PATH"
 
 RUN --mount=type=cache,target=${POETRY_CACHE_DIR} \
     poetry install --no-root --no-interaction
