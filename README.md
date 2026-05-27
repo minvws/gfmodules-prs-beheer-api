@@ -1,8 +1,10 @@
 # GFmodules PRS beheer API
 
-This app is .... and is part of
+This app is a management API for registering and administering organisations and their clients within the PRS system, and is part of
 the 'Generieke Functies, lokalisatie en addressering' project of the Ministry of Health,
-Welfare and Sport of the Dutch government. This application is responsible for ...
+Welfare and Sport of the Dutch government. This application is responsible for managing the
+lifecycle of organisations (identified by OIN) and their associated client registrations,
+including optional mTLS client certificate management.
 
 > [!CAUTION]
 >
@@ -51,7 +53,7 @@ export NEW_GID=$(id -g)
 
 After this you can simply run `docker compose up`.
 
-The application will be available at `http://localhost:8577` when the startup is completed.
+The application will be available at `http://localhost:8512` when the startup is completed.
 
 ## Docker container builds
 
