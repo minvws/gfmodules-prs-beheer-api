@@ -30,6 +30,7 @@ RUN groupadd --system ${APP_GROUP} --gid=${NEW_GID} && \
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         curl \
+        postgresql-client \
         libssl3 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -101,6 +102,8 @@ COPY --from=builder-runtime --chown=${APP_USER}:${APP_GROUP} ${VIRTUAL_ENV} ${VI
 # Copy only what the app needs at runtime (no tests, docs, CI artifacts, etc.)
 COPY --chown=${APP_USER}:${APP_GROUP} app/ /src/app/
 COPY --chown=${APP_USER}:${APP_GROUP} app.conf.example /src/
+COPY --chown=${APP_USER}:${APP_GROUP} sql/ /src/sql/
+COPY --chown=${APP_USER}:${APP_GROUP} tools/migrate_db.sh /src/tools/migrate_db.sh
 
 # version.json is generated from build args so CI workspace artifacts never leak in
 ARG RELEASE_VERSION=dev
