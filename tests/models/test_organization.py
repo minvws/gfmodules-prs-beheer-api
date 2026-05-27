@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from app.models.oin import Oin
 from app.models.organization import OrganizationCreate, OrganizationUpdate
 
 VALID_PEM_CERT = """-----BEGIN CERTIFICATE-----
@@ -23,15 +24,15 @@ QU4s4T+D/W6b8luriaw=
 
 
 def test_create_should_succeed() -> None:
-    model = OrganizationCreate(oin="00000001234567890000", common_name="Test Organization")
-    assert model.oin == "00000001234567890000"
+    model = OrganizationCreate(oin=Oin("00000001234567890000"), common_name="Test Organization")
+    assert str(model.oin) == "00000001234567890000"
     assert model.common_name == "Test Organization"
     assert model.client_certificate is None
 
 
 def test_create_with_certificate_should_succeed() -> None:
     model = OrganizationCreate(
-        oin="00000001234567890000",
+        oin=Oin("00000001234567890000"),
         common_name="Test Organization",
         client_certificate=VALID_PEM_CERT,
     )
@@ -41,7 +42,7 @@ def test_create_with_certificate_should_succeed() -> None:
 def test_create_with_invalid_certificate_should_raise() -> None:
     with pytest.raises(ValidationError, match="valid PEM"):
         OrganizationCreate(
-            oin="00000001234567890000",
+            oin=Oin("00000001234567890000"),
             common_name="Test Organization",
             client_certificate="-----BEGIN CERTIFICATE-----\nnot-valid-base64!!!\n-----END CERTIFICATE-----",
         )
@@ -50,7 +51,7 @@ def test_create_with_invalid_certificate_should_raise() -> None:
 def test_create_with_garbage_certificate_should_raise() -> None:
     with pytest.raises(ValidationError, match="valid PEM"):
         OrganizationCreate(
-            oin="00000001234567890000",
+            oin=Oin("00000001234567890000"),
             common_name="Test Organization",
             client_certificate="this is not a certificate at all",
         )
@@ -63,7 +64,7 @@ def test_create_missing_oin_should_raise() -> None:
 
 def test_create_missing_common_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        OrganizationCreate(oin="00000001234567890000")  # type: ignore[call-arg]
+        OrganizationCreate(oin=Oin("00000001234567890000"))  # type: ignore[call-arg]
 
 
 def test_update_should_succeed() -> None:
