@@ -3,11 +3,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.models.oin import Oin
+
 
 class ClientCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    oin: str
+    oin: Oin
     common_name: str
 
 
@@ -16,7 +18,7 @@ class ClientUpdate(BaseModel):
 
 
 class ClientQueryParams(BaseModel):
-    oin: str | None = None
+    oin: Oin | None = None
 
 
 class Client(ClientCreate):

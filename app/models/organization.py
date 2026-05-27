@@ -4,6 +4,8 @@ from uuid import UUID
 from cryptography import x509
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from app.models.oin import Oin
+
 
 def _validate_pem_certificate(value: str | None) -> str | None:
     if value is None:
@@ -18,7 +20,7 @@ def _validate_pem_certificate(value: str | None) -> str | None:
 class OrganizationCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    oin: str
+    oin: Oin
     common_name: str
     client_certificate: str | None = None
 
@@ -39,7 +41,7 @@ class OrganizationUpdate(BaseModel):
 
 
 class OrganizationQueryParams(BaseModel):
-    oin: str | None = None
+    oin: Oin | None = None
 
 
 class Organization(OrganizationCreate):
