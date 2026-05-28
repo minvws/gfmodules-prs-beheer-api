@@ -7,7 +7,4 @@ CREATE TABLE organizations (
     deleted_at TIMESTAMP
 );
 
-ALTER TABLE organizations OWNER TO prs_beheer_api_dba;
-GRANT SELECT, INSERT, UPDATE ON organizations TO prs_beheer_api;
-
 CREATE UNIQUE INDEX uq_organizations_oin_active ON organizations (oin) WHERE deleted_at IS NULL;
