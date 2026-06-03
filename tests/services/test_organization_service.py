@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 
 from app.db.models.organization import OrganizationEntity
+from app.models.oin import Oin
 from app.services.organization import OrganizationService
 
 
@@ -9,7 +10,7 @@ def test_create_one_should_succeed(
     organization_entity: OrganizationEntity,
 ) -> None:
     result = organization_service.create_one(
-        oin=organization_entity.oin,
+        oin=Oin(organization_entity.oin),
         common_name=organization_entity.common_name,
     )
     assert isinstance(result.id, UUID)
@@ -24,7 +25,7 @@ def test_create_one_with_certificate_should_succeed(
 ) -> None:
     cert = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     result = organization_service.create_one(
-        oin=organization_entity.oin,
+        oin=Oin(organization_entity.oin),
         common_name=organization_entity.common_name,
         client_certificate=cert,
     )
@@ -36,7 +37,7 @@ def test_get_one_should_succeed(
     organization_entity: OrganizationEntity,
 ) -> None:
     created = organization_service.create_one(
-        oin=organization_entity.oin,
+        oin=Oin(organization_entity.oin),
         common_name=organization_entity.common_name,
     )
     result = organization_service.get_one(created.id)
@@ -57,7 +58,7 @@ def test_delete_one_soft_deletes(
     organization_entity: OrganizationEntity,
 ) -> None:
     created = organization_service.create_one(
-        oin=organization_entity.oin,
+        oin=Oin(organization_entity.oin),
         common_name=organization_entity.common_name,
     )
     organization_service.delete_one(created.id)
@@ -77,7 +78,7 @@ def test_update_one_should_succeed(
     organization_entity: OrganizationEntity,
 ) -> None:
     created = organization_service.create_one(
-        oin=organization_entity.oin,
+        oin=Oin(organization_entity.oin),
         common_name=organization_entity.common_name,
     )
     result = organization_service.update_one(created.id, common_name="New Name")
@@ -92,7 +93,7 @@ def test_update_one_can_set_certificate(
 ) -> None:
     cert = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     created = organization_service.create_one(
-        oin=organization_entity.oin,
+        oin=Oin(organization_entity.oin),
         common_name=organization_entity.common_name,
     )
     result = organization_service.update_one(created.id, common_name=created.common_name, client_certificate=cert)
@@ -118,8 +119,8 @@ def test_get_many_returns_all(
     organization_service: OrganizationService,
     organization_entity: OrganizationEntity,
 ) -> None:
-    organization_service.create_one(oin=organization_entity.oin, common_name=organization_entity.common_name)
-    organization_service.create_one(oin="00000001234567890001", common_name="Other Org")
+    organization_service.create_one(oin=Oin(organization_entity.oin), common_name=organization_entity.common_name)
+    organization_service.create_one(oin=Oin("00000099000000002000"), common_name="Other Org")
     results = organization_service.get_many()
     assert len(results) == 2
 
@@ -129,7 +130,7 @@ def test_get_many_excludes_deleted(
     organization_entity: OrganizationEntity,
 ) -> None:
     created = organization_service.create_one(
-        oin=organization_entity.oin,
+        oin=Oin(organization_entity.oin),
         common_name=organization_entity.common_name,
     )
     organization_service.delete_one(created.id)
@@ -141,9 +142,9 @@ def test_get_many_filters_by_oin(
     organization_service: OrganizationService,
     organization_entity: OrganizationEntity,
 ) -> None:
-    organization_service.create_one(oin=organization_entity.oin, common_name=organization_entity.common_name)
-    organization_service.create_one(oin="00000001234567890001", common_name="Other Org")
+    organization_service.create_one(oin=Oin(organization_entity.oin), common_name=organization_entity.common_name)
+    organization_service.create_one(oin=Oin("00000099000000002000"), common_name="Other Org")
 
-    results = organization_service.get_many(oin=organization_entity.oin)
+    results = organization_service.get_many(oin=Oin(organization_entity.oin))
     assert len(results) == 1
     assert results[0].oin == organization_entity.oin

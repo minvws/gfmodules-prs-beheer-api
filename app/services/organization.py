@@ -5,6 +5,7 @@ from uuid import UUID
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from app.models.oin import Oin
 
 
 class OrganizationService:
@@ -16,21 +17,21 @@ class OrganizationService:
             repo = session.get_repository(OrganizationRepository)
             return repo.get_one(id)
 
-    def get_many(self, oin: str | None = None) -> List[OrganizationEntity]:
+    def get_many(self, oin: Oin | None = None) -> List[OrganizationEntity]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            return list(repo.get_many(oin=oin))
+            return list(repo.get_many(oin=str(oin) if oin else None))
 
     def create_one(
         self,
-        oin: str,
+        oin: Oin,
         common_name: str,
         client_certificate: str | None = None,
     ) -> OrganizationEntity:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             entity = OrganizationEntity(
-                oin=oin,
+                oin=str(oin),
                 common_name=common_name,
                 client_certificate=client_certificate,
             )

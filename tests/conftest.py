@@ -8,6 +8,7 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.models.oin import Oin
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 
@@ -34,7 +35,7 @@ def organization_service(database: Database) -> OrganizationService:
 @pytest.fixture()
 def organization_entity() -> OrganizationEntity:
     return OrganizationEntity(
-        oin="00000001234567890000",
+        oin="00000099000000001000",
         common_name="Test Organization",
         client_certificate=None,
     )
@@ -42,7 +43,7 @@ def organization_entity() -> OrganizationEntity:
 
 @pytest.fixture()
 def persisted_organization(organization_service: OrganizationService) -> OrganizationEntity:
-    return organization_service.create_one(oin="00000001234567890000", common_name="Test Organization")
+    return organization_service.create_one(oin=Oin("00000099000000001000"), common_name="Test Organization")
 
 
 @pytest.fixture()
@@ -59,6 +60,6 @@ def client_service(database: Database) -> ClientService:
 def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
     return ClientEntity(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin="00000099000000001000",
         common_name="Test Client",
     )

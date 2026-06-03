@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 
 from app.db.models.organization import OrganizationEntity
+from app.models.oin import Oin
 from app.services.client import ClientService
 
 
@@ -10,12 +11,12 @@ def test_create_one_should_succeed(
 ) -> None:
     result = client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Test Client",
     )
     assert isinstance(result.id, UUID)
     assert result.organization_id == persisted_organization.id
-    assert result.oin == "00000009876543210000"
+    assert result.oin == "00000099000000001000"
     assert result.common_name == "Test Client"
 
 
@@ -25,7 +26,7 @@ def test_get_one_should_succeed(
 ) -> None:
     created = client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Test Client",
     )
     result = client_service.get_one(created.id, persisted_organization.id)
@@ -47,7 +48,7 @@ def test_get_one_wrong_organization_returns_none(
 ) -> None:
     created = client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Test Client",
     )
     result = client_service.get_one(created.id, uuid4())
@@ -60,7 +61,7 @@ def test_delete_one_soft_deletes(
 ) -> None:
     created = client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Test Client",
     )
     client_service.delete_one(created.id, persisted_organization.id)
@@ -82,7 +83,7 @@ def test_update_one_should_succeed(
 ) -> None:
     created = client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Test Client",
     )
     result = client_service.update_one(created.id, persisted_organization.id, common_name="Updated Client")
@@ -113,12 +114,12 @@ def test_get_many_returns_all(
 ) -> None:
     client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Client A",
     )
     client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210001",
+        oin=Oin("00000099000000002000"),
         common_name="Client B",
     )
     results = client_service.get_many(organization_id=persisted_organization.id)
@@ -131,7 +132,7 @@ def test_get_many_scoped_to_organization(
 ) -> None:
     client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Test Client",
     )
     results = client_service.get_many(organization_id=uuid4())
@@ -144,7 +145,7 @@ def test_get_many_excludes_deleted(
 ) -> None:
     created = client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Test Client",
     )
     client_service.delete_one(created.id, persisted_organization.id)
@@ -158,14 +159,14 @@ def test_get_many_filters_by_oin(
 ) -> None:
     client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210000",
+        oin=Oin("00000099000000001000"),
         common_name="Client A",
     )
     client_service.create_one(
         organization_id=persisted_organization.id,
-        oin="00000009876543210001",
+        oin=Oin("00000099000000002000"),
         common_name="Client B",
     )
-    results = client_service.get_many(organization_id=persisted_organization.id, oin="00000009876543210000")
+    results = client_service.get_many(organization_id=persisted_organization.id, oin=Oin("00000099000000001000"))
     assert len(results) == 1
-    assert results[0].oin == "00000009876543210000"
+    assert results[0].oin == "00000099000000001000"
