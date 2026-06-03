@@ -25,15 +25,15 @@ class OrganizationService:
     def create_one(
         self,
         oin: Oin,
-        common_name: str,
-        client_certificate: str | None = None,
+        name: str,
+        authorizations: str | None = None,
     ) -> OrganizationEntity:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             entity = OrganizationEntity(
                 oin=str(oin),
-                common_name=common_name,
-                client_certificate=client_certificate,
+                name=name,
+                authorizations=authorizations,
             )
             return repo.add_one(entity)
 

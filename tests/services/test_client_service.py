@@ -18,6 +18,23 @@ def test_create_one_should_succeed(
     assert result.organization_id == persisted_organization.id
     assert result.oin == "00000099000000001000"
     assert result.common_name == "Test Client"
+    assert result.certificate is None
+    assert result.allowed_scopes is None
+
+
+def test_create_one_with_certificate_and_allowed_scopes_should_succeed(
+    client_service: ClientService,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    result = client_service.create_one(
+        organization_id=persisted_organization.id,
+        oin=Oin("00000099000000001000"),
+        common_name="Test Client",
+        certificate="-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+        allowed_scopes="scope:read scope:write",
+    )
+    assert result.certificate is not None
+    assert result.allowed_scopes == "scope:read scope:write"
 
 
 def test_get_one_should_succeed(
@@ -90,6 +107,45 @@ def test_update_one_should_succeed(
     assert result is not None
     assert result.common_name == "Updated Client"
     assert result.id == created.id
+
+
+def test_update_one_can_set_certificate_and_allowed_scopes(
+    client_service: ClientService,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    created = client_service.create_one(
+        organization_id=persisted_organization.id,
+        oin=Oin("00000099000000001000"),
+        common_name="Test Client",
+    )
+    result = client_service.update_one(
+        created.id,
+        persisted_organization.id,
+        common_name=created.common_name,
+        certificate="-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+        allowed_scopes="scope:admin",
+    )
+    assert result is not None
+    assert result.certificate is not None
+    assert result.allowed_scopes == "scope:admin"
+
+
+def test_update_one_preserves_certificate_and_allowed_scopes_when_not_in_kwargs(
+    client_service: ClientService,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    created = client_service.create_one(
+        organization_id=persisted_organization.id,
+        oin=Oin("00000099000000001000"),
+        common_name="Test Client",
+        certificate="-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----",
+        allowed_scopes="scope:read",
+    )
+    result = client_service.update_one(created.id, persisted_organization.id, common_name="Updated Client")
+    assert result is not None
+    assert result.common_name == "Updated Client"
+    assert result.certificate == created.certificate
+    assert result.allowed_scopes == created.allowed_scopes
 
 
 def test_update_one_returns_none_when_not_found(

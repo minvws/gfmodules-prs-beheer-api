@@ -36,14 +36,14 @@ def organization_service(database: Database) -> OrganizationService:
 def organization_entity() -> OrganizationEntity:
     return OrganizationEntity(
         oin="00000099000000001000",
-        common_name="Test Organization",
-        client_certificate=None,
+        name="Test Organization",
+        authorizations=None,
     )
 
 
 @pytest.fixture()
 def persisted_organization(organization_service: OrganizationService) -> OrganizationEntity:
-    return organization_service.create_one(oin=Oin("00000099000000001000"), common_name="Test Organization")
+    return organization_service.create_one(oin=Oin("00000099000000001000"), name="Test Organization")
 
 
 @pytest.fixture()

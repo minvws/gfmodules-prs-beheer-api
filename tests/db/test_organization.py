@@ -40,10 +40,10 @@ def test_update_success(
         organization_repository.add_one(organization_entity)
         result = organization_repository.update(
             id=organization_entity.id,
-            common_name="Updated Name",
+            name="Updated Name",
         )
         assert result is not None
-        assert result.common_name == "Updated Name"
+        assert result.name == "Updated Name"
 
 
 def test_update_ignores_invalid_fields(
@@ -63,7 +63,7 @@ def test_update_not_found(
     organization_repository: OrganizationRepository,
 ) -> None:
     with organization_repository.db_session:
-        result = organization_repository.update(uuid4(), common_name="Does not exist")
+        result = organization_repository.update(uuid4(), name="Does not exist")
         assert result is None
 
 
@@ -73,7 +73,7 @@ def test_get_many_returns_all(
 ) -> None:
     entity_2 = OrganizationEntity(
         oin="00000099000000002000",
-        common_name="Another Organization",
+        name="Another Organization",
     )
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
@@ -88,7 +88,7 @@ def test_get_many_filters_by_oin(
 ) -> None:
     entity_2 = OrganizationEntity(
         oin="00000099000000002000",
-        common_name="Another Organization",
+        name="Another Organization",
     )
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)

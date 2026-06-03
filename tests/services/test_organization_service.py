@@ -11,25 +11,24 @@ def test_create_one_should_succeed(
 ) -> None:
     result = organization_service.create_one(
         oin=Oin(organization_entity.oin),
-        common_name=organization_entity.common_name,
+        name=organization_entity.name,
     )
     assert isinstance(result.id, UUID)
     assert result.oin == organization_entity.oin
-    assert result.common_name == organization_entity.common_name
-    assert result.client_certificate is None
+    assert result.name == organization_entity.name
+    assert result.authorizations is None
 
 
-def test_create_one_with_certificate_should_succeed(
+def test_create_one_with_authorizations_should_succeed(
     organization_service: OrganizationService,
     organization_entity: OrganizationEntity,
 ) -> None:
-    cert = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     result = organization_service.create_one(
         oin=Oin(organization_entity.oin),
-        common_name=organization_entity.common_name,
-        client_certificate=cert,
+        name=organization_entity.name,
+        authorizations="scope:a scope:b",
     )
-    assert result.client_certificate == cert
+    assert result.authorizations == "scope:a scope:b"
 
 
 def test_get_one_should_succeed(
@@ -38,7 +37,7 @@ def test_get_one_should_succeed(
 ) -> None:
     created = organization_service.create_one(
         oin=Oin(organization_entity.oin),
-        common_name=organization_entity.common_name,
+        name=organization_entity.name,
     )
     result = organization_service.get_one(created.id)
     assert result is not None
@@ -59,7 +58,7 @@ def test_delete_one_soft_deletes(
 ) -> None:
     created = organization_service.create_one(
         oin=Oin(organization_entity.oin),
-        common_name=organization_entity.common_name,
+        name=organization_entity.name,
     )
     organization_service.delete_one(created.id)
     result = organization_service.get_one(created.id)
@@ -79,32 +78,46 @@ def test_update_one_should_succeed(
 ) -> None:
     created = organization_service.create_one(
         oin=Oin(organization_entity.oin),
-        common_name=organization_entity.common_name,
+        name=organization_entity.name,
     )
-    result = organization_service.update_one(created.id, common_name="New Name")
+    result = organization_service.update_one(created.id, name="New Name")
     assert result is not None
-    assert result.common_name == "New Name"
+    assert result.name == "New Name"
     assert result.id == created.id
 
 
-def test_update_one_can_set_certificate(
+def test_update_one_can_set_authorizations(
     organization_service: OrganizationService,
     organization_entity: OrganizationEntity,
 ) -> None:
-    cert = "-----BEGIN CERTIFICATE-----\nMIIB...\n-----END CERTIFICATE-----"
     created = organization_service.create_one(
         oin=Oin(organization_entity.oin),
-        common_name=organization_entity.common_name,
+        name=organization_entity.name,
     )
-    result = organization_service.update_one(created.id, common_name=created.common_name, client_certificate=cert)
+    result = organization_service.update_one(created.id, name=created.name, authorizations="scope:updated")
     assert result is not None
-    assert result.client_certificate == cert
+    assert result.authorizations == "scope:updated"
+
+
+def test_update_one_preserves_authorizations_when_not_in_kwargs(
+    organization_service: OrganizationService,
+    organization_entity: OrganizationEntity,
+) -> None:
+    created = organization_service.create_one(
+        oin=Oin(organization_entity.oin),
+        name=organization_entity.name,
+        authorizations="scope:existing",
+    )
+    result = organization_service.update_one(created.id, name="New Name")
+    assert result is not None
+    assert result.name == "New Name"
+    assert result.authorizations == "scope:existing"
 
 
 def test_update_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
-    result = organization_service.update_one(uuid4(), common_name="Ghost")
+    result = organization_service.update_one(uuid4(), name="Ghost")
     assert result is None
 
 
@@ -119,8 +132,8 @@ def test_get_many_returns_all(
     organization_service: OrganizationService,
     organization_entity: OrganizationEntity,
 ) -> None:
-    organization_service.create_one(oin=Oin(organization_entity.oin), common_name=organization_entity.common_name)
-    organization_service.create_one(oin=Oin("00000099000000002000"), common_name="Other Org")
+    organization_service.create_one(oin=Oin(organization_entity.oin), name=organization_entity.name)
+    organization_service.create_one(oin=Oin("00000099000000002000"), name="Other Org")
     results = organization_service.get_many()
     assert len(results) == 2
 
@@ -131,7 +144,7 @@ def test_get_many_excludes_deleted(
 ) -> None:
     created = organization_service.create_one(
         oin=Oin(organization_entity.oin),
-        common_name=organization_entity.common_name,
+        name=organization_entity.name,
     )
     organization_service.delete_one(created.id)
     results = organization_service.get_many()
@@ -142,8 +155,8 @@ def test_get_many_filters_by_oin(
     organization_service: OrganizationService,
     organization_entity: OrganizationEntity,
 ) -> None:
-    organization_service.create_one(oin=Oin(organization_entity.oin), common_name=organization_entity.common_name)
-    organization_service.create_one(oin=Oin("00000099000000002000"), common_name="Other Org")
+    organization_service.create_one(oin=Oin(organization_entity.oin), name=organization_entity.name)
+    organization_service.create_one(oin=Oin("00000099000000002000"), name="Other Org")
 
     results = organization_service.get_many(oin=Oin(organization_entity.oin))
     assert len(results) == 1

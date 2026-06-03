@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlalchemy import TIMESTAMP, Index, String, Text, text
+from sqlalchemy import TIMESTAMP, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Uuid
 
@@ -22,8 +22,8 @@ class OrganizationEntity(Base):
     )
 
     id: Mapped[UUID] = mapped_column("id", Uuid, primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column("name", String)
     oin: Mapped[str] = mapped_column("oin", String)
-    common_name: Mapped[str] = mapped_column("common_name", String)
-    client_certificate: Mapped[Optional[str]] = mapped_column("client_certificate", Text)
+    authorizations: Mapped[Optional[str]] = mapped_column("authorizations", String)
     created_at: Mapped[datetime] = mapped_column("created_at", TIMESTAMP, default=datetime.now)
     deleted_at: Mapped[Optional[datetime]] = mapped_column("deleted_at", TIMESTAMP)

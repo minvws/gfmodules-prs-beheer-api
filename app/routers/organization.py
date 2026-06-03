@@ -50,7 +50,7 @@ def update(
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    result = service.update_one(id, **body.model_dump())
+    result = service.update_one(id, **body.model_dump(exclude_unset=True))
     if result is None:
         raise HTTPException(status_code=404)
     return result

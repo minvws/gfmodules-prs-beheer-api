@@ -86,7 +86,7 @@ def update(
     body: ClientUpdate,
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
-    result = service.update_one(id, organization_id, **body.model_dump())
+    result = service.update_one(id, organization_id, **body.model_dump(exclude_unset=True))
     if result is None:
         raise HTTPException(status_code=404)
     return result
