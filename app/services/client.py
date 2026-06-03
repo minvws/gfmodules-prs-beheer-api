@@ -5,6 +5,7 @@ from uuid import UUID
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
+from app.models.oin import Oin
 
 
 class ClientService:
@@ -16,17 +17,17 @@ class ClientService:
             repo = session.get_repository(ClientRepository)
             return repo.get_one(id, organization_id)
 
-    def get_many(self, organization_id: UUID, oin: str | None = None) -> List[ClientEntity]:
+    def get_many(self, organization_id: UUID, oin: Oin | None = None) -> List[ClientEntity]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
-            return list(repo.get_many(organization_id=organization_id, oin=oin))
+            return list(repo.get_many(organization_id=organization_id, oin=str(oin) if oin else None))
 
-    def create_one(self, organization_id: UUID, oin: str, common_name: str) -> ClientEntity:
+    def create_one(self, organization_id: UUID, oin: Oin, common_name: str) -> ClientEntity:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
             entity = ClientEntity(
                 organization_id=organization_id,
-                oin=oin,
+                oin=str(oin),
                 common_name=common_name,
             )
             return repo.add_one(entity)
