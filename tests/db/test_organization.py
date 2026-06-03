@@ -72,7 +72,7 @@ def test_get_many_returns_all(
     organization_entity: OrganizationEntity,
 ) -> None:
     entity_2 = OrganizationEntity(
-        oin="00000001234567890001",
+        oin="00000099000000002000",
         common_name="Another Organization",
     )
     with organization_repository.db_session:
@@ -87,7 +87,7 @@ def test_get_many_filters_by_oin(
     organization_entity: OrganizationEntity,
 ) -> None:
     entity_2 = OrganizationEntity(
-        oin="00000001234567890001",
+        oin="00000099000000002000",
         common_name="Another Organization",
     )
     with organization_repository.db_session:

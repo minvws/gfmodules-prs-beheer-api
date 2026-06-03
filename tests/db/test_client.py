@@ -74,7 +74,7 @@ def test_get_many_returns_all(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
-        oin="00000009876543210001",
+        oin="00000099000000002000",
         common_name="Another Client",
     )
     with client_repository.db_session:
@@ -90,7 +90,7 @@ def test_get_many_filters_by_oin(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
-        oin="00000009876543210001",
+        oin="00000099000000002000",
         common_name="Another Client",
     )
     with client_repository.db_session:

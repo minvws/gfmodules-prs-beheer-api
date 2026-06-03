@@ -6,8 +6,8 @@ from app.models.oin import Oin
 
 
 def test_create_should_succeed() -> None:
-    model = ClientCreate(oin=Oin("00000009876543210000"), common_name="Test Client")
-    assert str(model.oin) == "00000009876543210000"
+    model = ClientCreate(oin=Oin("00000099000000001000"), common_name="Test Client")
+    assert str(model.oin) == "00000099000000001000"
     assert model.common_name == "Test Client"
 
 
@@ -18,7 +18,7 @@ def test_create_missing_oin_should_raise() -> None:
 
 def test_create_missing_common_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        ClientCreate(oin=Oin("00000009876543210000"))  # type: ignore[call-arg]
+        ClientCreate(oin=Oin("00000099000000001000"))  # type: ignore[call-arg]
 
 
 def test_update_should_succeed() -> None:
