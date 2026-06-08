@@ -36,6 +36,7 @@ codespell = "^2.4.1"
 pip-audit = "^2.10.0"
 mypy = "^2.1.0"
 types-requests = "^2.33.0.20260518"
+httpx = "^0.28.1"
 
 [tool.poetry.group.debug.dependencies]
 debugpy = "^1.8.20"

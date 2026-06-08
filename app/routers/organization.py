@@ -22,15 +22,7 @@ def register(
     try:
         return service.create_one(**data.model_dump())
     except IntegrityError:
-        raise HTTPException(status_code=409, detail="An organization with this OIN is already registered.")
-
-
-@router.get("", response_model=List[Organization], response_model_exclude_none=True)
-def get_many(
-    params: Annotated[OrganizationQueryParams, Query()],
-    service: Annotated[OrganizationService, Depends(get_organization_service)],
-) -> Any:
-    return service.get_many(**params.model_dump())
+        raise HTTPException(status_code=409, detail="An organization with this ID is already registered.")
 
 
 @router.get("/{id}", response_model=Organization, response_model_exclude_none=True)
@@ -44,13 +36,21 @@ def get_by_id(
     return result
 
 
+@router.get("", response_model=List[Organization], response_model_exclude_none=True)
+def get_many(
+    params: Annotated[OrganizationQueryParams, Query()],
+    service: Annotated[OrganizationService, Depends(get_organization_service)],
+) -> Any:
+    return service.get_many(**params.model_dump())
+
+
 @router.put("/{id}", response_model=Organization, response_model_exclude_none=True)
 def update(
     id: UUID,
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    result = service.update_one(id, **body.model_dump())
+    result = service.update_one(id, **body.model_dump(exclude_unset=True))
     if result is None:
         raise HTTPException(status_code=404)
     return result

@@ -11,6 +11,7 @@ from app.routers.client import router as client_router
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
 from app.routers.organization import router as organization_router
+from app.routers.resolve import router as resolve_router
 
 
 def get_uvicorn_params() -> dict[str, Any]:
@@ -72,7 +73,7 @@ def setup_fastapi() -> FastAPI:
 
     container.configure()
 
-    routers = [default_router, health_router, organization_router, client_router]
+    routers = [default_router, health_router, organization_router, client_router, resolve_router]
 
     for router in routers:
         fastapi.include_router(router)

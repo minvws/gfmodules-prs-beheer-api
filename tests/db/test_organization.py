@@ -6,7 +6,7 @@ from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
-from tests.db.conftest import TEST_REGISTER_ID
+from tests.conftest import TEST_REGISTER_ID
 
 
 def test_add_one(
@@ -117,6 +117,18 @@ def test_get_many_excludes_deleted(
         organization_repository.add_one(organization_entity)
         organization_repository.update(id=organization_entity.id, deleted_at=datetime.now())
         assert organization_repository.get_many() == []
+
+
+def test_get_many_include_deleted_returns_deleted(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+) -> None:
+    with organization_repository.db_session:
+        organization_repository.add_one(organization_entity)
+        organization_repository.update(id=organization_entity.id, deleted_at=datetime.now())
+        results = organization_repository.get_many(include_deleted=True)
+        assert len(results) == 1
+        assert results[0].id == organization_entity.id
 
 
 def test_accessing_clients_raises_lazy_load(
