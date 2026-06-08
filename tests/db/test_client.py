@@ -1,11 +1,15 @@
 from datetime import datetime
 from uuid import uuid4
 
+import pytest
+from sqlalchemy.exc import InvalidRequestError
+
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
+from tests.db.conftest import TEST_MANDATE_ID, TEST_OIN
 
 
-def test_add_one_success(
+def test_add_one(
     client_repository: ClientRepository,
     client_entity: ClientEntity,
 ) -> None:
@@ -20,7 +24,7 @@ def test_get_one_found(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        result = client_repository.get_one(client_entity.id, client_entity.organization_id)
+        result = client_repository.get_one(client_entity.organization_id, client_entity.mandate_id)
         assert result is not None
         assert result.id == client_entity.id
 
@@ -30,18 +34,16 @@ def test_get_one_not_found(
     client_entity: ClientEntity,
 ) -> None:
     with client_repository.db_session:
-        result = client_repository.get_one(uuid4(), client_entity.organization_id)
-        assert result is None
+        assert client_repository.get_one(uuid4(), client_entity.mandate_id) is None
 
 
-def test_get_one_wrong_organization(
+def test_get_one_wrong_mandate(
     client_repository: ClientRepository,
     client_entity: ClientEntity,
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        result = client_repository.get_one(client_entity.id, uuid4())
-        assert result is None
+        assert client_repository.get_one(client_entity.organization_id, "wrong-mandate") is None
 
 
 def test_update_success(
@@ -51,21 +53,15 @@ def test_update_success(
     with client_repository.db_session:
         client_repository.add_one(client_entity)
         result = client_repository.update(
-            id=client_entity.id,
-            organization_id=client_entity.organization_id,
-            common_name="Updated Name",
+            client_entity.organization_id, client_entity.mandate_id, common_name="Updated Name"
         )
         assert result is not None
         assert result.common_name == "Updated Name"
 
 
-def test_update_not_found(
-    client_repository: ClientRepository,
-    client_entity: ClientEntity,
-) -> None:
+def test_update_not_found(client_repository: ClientRepository) -> None:
     with client_repository.db_session:
-        result = client_repository.update(uuid4(), client_entity.organization_id, common_name="Ghost")
-        assert result is None
+        assert client_repository.update(uuid4(), TEST_MANDATE_ID, common_name="Not Found") is None
 
 
 def test_get_many_returns_all(
@@ -74,14 +70,14 @@ def test_get_many_returns_all(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
-        oin="00000099000000002000",
+        mandate_id="mandate-002",
+        oin=TEST_OIN,
         common_name="Another Client",
     )
     with client_repository.db_session:
         client_repository.add_one(client_entity)
         client_repository.add_one(entity_2)
-        results = client_repository.get_many(organization_id=client_entity.organization_id)
-        assert len(results) == 2
+        assert len(client_repository.get_many(organization_id=client_entity.organization_id)) == 2
 
 
 def test_get_many_filters_by_oin(
@@ -90,16 +86,14 @@ def test_get_many_filters_by_oin(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
+        mandate_id="mandate-002",
         oin="00000099000000002000",
         common_name="Another Client",
     )
     with client_repository.db_session:
         client_repository.add_one(client_entity)
         client_repository.add_one(entity_2)
-        results = client_repository.get_many(
-            organization_id=client_entity.organization_id,
-            oin=client_entity.oin,
-        )
+        results = client_repository.get_many(organization_id=client_entity.organization_id, oin=TEST_OIN)
         assert len(results) == 1
         assert results[0].id == client_entity.id
 
@@ -110,13 +104,8 @@ def test_get_many_excludes_deleted(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        client_repository.update(
-            id=client_entity.id,
-            organization_id=client_entity.organization_id,
-            deleted_at=datetime.now(),
-        )
-        results = client_repository.get_many(organization_id=client_entity.organization_id)
-        assert len(results) == 0
+        client_repository.update(client_entity.organization_id, client_entity.mandate_id, deleted_at=datetime.now())
+        assert client_repository.get_many(organization_id=client_entity.organization_id) == []
 
 
 def test_get_many_scoped_to_organization(
@@ -125,5 +114,16 @@ def test_get_many_scoped_to_organization(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        results = client_repository.get_many(organization_id=uuid4())
-        assert len(results) == 0
+        assert client_repository.get_many(organization_id=uuid4()) == []
+
+
+def test_accessing_organization_raises_lazy_load(
+    client_repository: ClientRepository,
+    client_entity: ClientEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(client_entity)
+        result = client_repository.get_one(client_entity.organization_id, client_entity.mandate_id)
+        assert result is not None
+        with pytest.raises(InvalidRequestError):
+            _ = result.organization

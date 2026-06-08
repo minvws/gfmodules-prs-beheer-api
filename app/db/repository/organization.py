@@ -29,11 +29,19 @@ class OrganizationRepository(RepositoryBase):
         )
         return self.db_session.session.execute(stmt).scalar()
 
-    def get_many(self, oin: str | None = None) -> Sequence[OrganizationEntity]:
-        conditions: list[ColumnElement[bool]] = [OrganizationEntity.deleted_at.is_(None)]
-        if oin:
-            conditions.append(OrganizationEntity.oin == oin)
+    def get_one_by_register_id(self, register_id: str) -> OrganizationEntity | None:
+        stmt = select(OrganizationEntity).where(
+            and_(
+                OrganizationEntity.register_id == register_id,
+                OrganizationEntity.deleted_at.is_(None),
+            )
+        )
+        return self.db_session.session.execute(stmt).scalar()
 
+    def get_many(self, register_id: str | None = None) -> Sequence[OrganizationEntity]:
+        conditions: list[ColumnElement[bool]] = [OrganizationEntity.deleted_at.is_(None)]
+        if register_id:
+            conditions.append(OrganizationEntity.register_id == register_id)
         stmt = select(OrganizationEntity).where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 
@@ -42,7 +50,6 @@ class OrganizationRepository(RepositoryBase):
             target = {k: kwargs[k] for k in OrganizationEntity.__table__.columns.keys() if k in kwargs}
             if not target:
                 return None
-
             stmt = (
                 update(OrganizationEntity)
                 .where(
@@ -54,7 +61,6 @@ class OrganizationRepository(RepositoryBase):
                 .values(target)
                 .returning(OrganizationEntity)
             )
-
             result = self.db_session.session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
             return result
