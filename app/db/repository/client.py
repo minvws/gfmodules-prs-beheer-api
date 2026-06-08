@@ -20,11 +20,23 @@ class ClientRepository(RepositoryBase):
             self.db_session.rollback()
             raise e
 
-    def get_one(self, id: UUID, organization_id: UUID) -> ClientEntity | None:
+    def get_one(self, organization_id: UUID, mandate_id: str) -> ClientEntity | None:
         stmt = select(ClientEntity).where(
             and_(
-                ClientEntity.id == id,
                 ClientEntity.organization_id == organization_id,
+                ClientEntity.mandate_id == mandate_id,
+                ClientEntity.deleted_at.is_(None),
+            )
+        )
+        return self.db_session.session.execute(stmt).scalar()
+
+    def get_by_credentials(self, common_name: str, oin: str, mandate_id: str) -> ClientEntity | None:
+        """Look up a client by the credentials used in an OAuth resolve request."""
+        stmt = select(ClientEntity).where(
+            and_(
+                ClientEntity.common_name == common_name,
+                ClientEntity.oin == oin,
+                ClientEntity.mandate_id == mandate_id,
                 ClientEntity.deleted_at.is_(None),
             )
         )
@@ -37,29 +49,26 @@ class ClientRepository(RepositoryBase):
         ]
         if oin:
             conditions.append(ClientEntity.oin == oin)
-
         stmt = select(ClientEntity).where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 
-    def update(self, id: UUID, organization_id: UUID, **kwargs: object) -> ClientEntity | None:
+    def update(self, organization_id: UUID, mandate_id: str, **kwargs: object) -> ClientEntity | None:
         try:
             target = {k: kwargs[k] for k in ClientEntity.__table__.columns.keys() if k in kwargs}
             if not target:
                 return None
-
             stmt = (
                 update(ClientEntity)
                 .where(
                     and_(
-                        ClientEntity.id == id,
                         ClientEntity.organization_id == organization_id,
+                        ClientEntity.mandate_id == mandate_id,
                         ClientEntity.deleted_at.is_(None),
                     )
                 )
                 .values(target)
                 .returning(ClientEntity)
             )
-
             result = self.db_session.session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
             return result
