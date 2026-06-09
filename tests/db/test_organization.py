@@ -1,10 +1,15 @@
+from datetime import datetime
 from uuid import uuid4
+
+import pytest
+from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from tests.db.conftest import TEST_REGISTER_ID
 
 
-def test_add_one_success(
+def test_add_one(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
@@ -24,12 +29,34 @@ def test_get_one_found(
         assert result.id == organization_entity.id
 
 
-def test_get_one_not_found(
+def test_get_one_not_found(organization_repository: OrganizationRepository) -> None:
+    with organization_repository.db_session:
+        assert organization_repository.get_one(uuid4()) is None
+
+
+def test_exists_found(
     organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
 ) -> None:
     with organization_repository.db_session:
-        result = organization_repository.get_one(uuid4())
-        assert result is None
+        organization_repository.add_one(organization_entity)
+        assert organization_repository.exists(organization_entity.id) is True
+
+
+def test_exists_not_found(organization_repository: OrganizationRepository) -> None:
+    with organization_repository.db_session:
+        assert organization_repository.exists(uuid4()) is False
+
+
+def test_get_one_by_register_id(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+) -> None:
+    with organization_repository.db_session:
+        organization_repository.add_one(organization_entity)
+        result = organization_repository.get_one_by_register_id(TEST_REGISTER_ID)
+        assert result is not None
+        assert result.register_id == TEST_REGISTER_ID
 
 
 def test_update_success(
@@ -38,12 +65,9 @@ def test_update_success(
 ) -> None:
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
-        result = organization_repository.update(
-            id=organization_entity.id,
-            common_name="Updated Name",
-        )
+        result = organization_repository.update(id=organization_entity.id, name="Updated Name")
         assert result is not None
-        assert result.common_name == "Updated Name"
+        assert result.name == "Updated Name"
 
 
 def test_update_ignores_invalid_fields(
@@ -52,48 +76,35 @@ def test_update_ignores_invalid_fields(
 ) -> None:
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
-        result = organization_repository.update(
-            id=organization_entity.id,
-            non_existing_field="value",
-        )
+        result = organization_repository.update(id=organization_entity.id, non_existing_field="value")
         assert result is None
 
 
-def test_update_not_found(
-    organization_repository: OrganizationRepository,
-) -> None:
+def test_update_not_found(organization_repository: OrganizationRepository) -> None:
     with organization_repository.db_session:
-        result = organization_repository.update(uuid4(), common_name="Does not exist")
-        assert result is None
+        assert organization_repository.update(uuid4(), name="Ghost") is None
 
 
 def test_get_many_returns_all(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
-    entity_2 = OrganizationEntity(
-        oin="00000099000000002000",
-        common_name="Another Organization",
-    )
+    entity_2 = OrganizationEntity(register_id="test-register-002", name="Another Organization")
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
         organization_repository.add_one(entity_2)
-        results = organization_repository.get_many()
-        assert len(results) == 2
+        assert len(organization_repository.get_many()) == 2
 
 
-def test_get_many_filters_by_oin(
+def test_get_many_filters_by_register_id(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
-    entity_2 = OrganizationEntity(
-        oin="00000099000000002000",
-        common_name="Another Organization",
-    )
+    entity_2 = OrganizationEntity(register_id="test-register-002", name="Another Organization")
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
         organization_repository.add_one(entity_2)
-        results = organization_repository.get_many(oin=organization_entity.oin)
+        results = organization_repository.get_many(register_id=TEST_REGISTER_ID)
         assert len(results) == 1
         assert results[0].id == organization_entity.id
 
@@ -102,10 +113,19 @@ def test_get_many_excludes_deleted(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,
 ) -> None:
-    from datetime import datetime
-
     with organization_repository.db_session:
         organization_repository.add_one(organization_entity)
         organization_repository.update(id=organization_entity.id, deleted_at=datetime.now())
-        results = organization_repository.get_many()
-        assert len(results) == 0
+        assert organization_repository.get_many() == []
+
+
+def test_accessing_clients_raises_lazy_load(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+) -> None:
+    with organization_repository.db_session:
+        organization_repository.add_one(organization_entity)
+        result = organization_repository.get_one(organization_entity.id)
+        assert result is not None
+        with pytest.raises(InvalidRequestError):
+            _ = result.clients

@@ -34,11 +34,14 @@ def organization_service(database: Database) -> OrganizationService:
 
 @pytest.fixture()
 def organization_entity() -> OrganizationEntity:
-    return OrganizationEntity(
-        oin="00000099000000001000",
-        common_name="Test Organization",
-        client_certificate=None,
+    entity = OrganizationEntity(
+        register_id="00000099000000001000",
+        name="Test Organization",
     )
+    entity.oin = entity.register_id  # type: ignore
+    entity.common_name = entity.name  # type: ignore
+    entity.client_certificate = None  # type: ignore
+    return entity
 
 
 @pytest.fixture()
@@ -60,6 +63,7 @@ def client_service(database: Database) -> ClientService:
 def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
     return ClientEntity(
         organization_id=persisted_organization.id,
+        mandate_id="00000099000000001000",
         oin="00000099000000001000",
         common_name="Test Client",
     )

@@ -21,19 +21,26 @@ class OrganizationRepository(RepositoryBase):
             raise e
 
     def get_one(self, id: UUID) -> OrganizationEntity | None:
+        stmt = select(OrganizationEntity).where(self._and_clause(id))
+        return self.db_session.session.execute(stmt).scalar()
+
+    def exists(self, id: UUID) -> bool:
+        stmt = select(select(OrganizationEntity.id).where(self._and_clause(id)).exists())
+        return bool(self.db_session.session.execute(stmt).scalar())
+
+    def get_one_by_register_id(self, register_id: str) -> OrganizationEntity | None:
         stmt = select(OrganizationEntity).where(
             and_(
-                OrganizationEntity.id == id,
+                OrganizationEntity.register_id == register_id,
                 OrganizationEntity.deleted_at.is_(None),
             )
         )
         return self.db_session.session.execute(stmt).scalar()
 
-    def get_many(self, oin: str | None = None) -> Sequence[OrganizationEntity]:
+    def get_many(self, register_id: str | None = None) -> Sequence[OrganizationEntity]:
         conditions: list[ColumnElement[bool]] = [OrganizationEntity.deleted_at.is_(None)]
-        if oin:
-            conditions.append(OrganizationEntity.oin == oin)
-
+        if register_id:
+            conditions.append(OrganizationEntity.register_id == register_id)
         stmt = select(OrganizationEntity).where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 
@@ -42,22 +49,16 @@ class OrganizationRepository(RepositoryBase):
             target = {k: kwargs[k] for k in OrganizationEntity.__table__.columns.keys() if k in kwargs}
             if not target:
                 return None
-
-            stmt = (
-                update(OrganizationEntity)
-                .where(
-                    and_(
-                        OrganizationEntity.id == id,
-                        OrganizationEntity.deleted_at.is_(None),
-                    )
-                )
-                .values(target)
-                .returning(OrganizationEntity)
-            )
-
+            stmt = update(OrganizationEntity).where(self._and_clause(id)).values(target).returning(OrganizationEntity)
             result = self.db_session.session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
             return result
         except SQLAlchemyError as e:
             self.db_session.rollback()
             raise e
+
+    def _and_clause(self, id: UUID) -> ColumnElement[bool]:
+        return and_(
+            OrganizationEntity.id == id,
+            OrganizationEntity.deleted_at.is_(None),
+        )

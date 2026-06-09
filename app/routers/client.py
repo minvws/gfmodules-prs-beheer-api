@@ -19,7 +19,7 @@ def get_organization_or_404(
     organization_id: UUID,
     organization_service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> None:
-    if organization_service.get_one(organization_id) is None:
+    if not organization_service.exists(organization_id):
         raise HTTPException(status_code=404, detail="Organization not found.")
 
 

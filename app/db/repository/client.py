@@ -20,11 +20,21 @@ class ClientRepository(RepositoryBase):
             self.db_session.rollback()
             raise e
 
-    def get_one(self, id: UUID, organization_id: UUID) -> ClientEntity | None:
+    def get_one(self, organization_id: UUID, id: UUID) -> ClientEntity | None:
+        stmt = select(ClientEntity).where(self._and_clause(organization_id, id))
+        return self.db_session.session.execute(stmt).scalar_one_or_none()
+
+    def exists(self, organization_id: UUID, id: UUID) -> bool:
+        stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
+        return bool(self.db_session.session.execute(stmt).scalar())
+
+    def get_by_credentials(self, common_name: str, oin: str, mandate_id: str) -> ClientEntity | None:
+        """Look up a client by the credentials used in an OAuth resolve request."""
         stmt = select(ClientEntity).where(
             and_(
-                ClientEntity.id == id,
-                ClientEntity.organization_id == organization_id,
+                ClientEntity.common_name == common_name,
+                ClientEntity.oin == oin,
+                ClientEntity.mandate_id == mandate_id,
                 ClientEntity.deleted_at.is_(None),
             )
         )
@@ -37,32 +47,27 @@ class ClientRepository(RepositoryBase):
         ]
         if oin:
             conditions.append(ClientEntity.oin == oin)
-
         stmt = select(ClientEntity).where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 
-    def update(self, id: UUID, organization_id: UUID, **kwargs: object) -> ClientEntity | None:
+    def update(self, organization_id: UUID, id: UUID, **kwargs: object) -> ClientEntity | None:
         try:
             target = {k: kwargs[k] for k in ClientEntity.__table__.columns.keys() if k in kwargs}
             if not target:
                 return None
-
             stmt = (
-                update(ClientEntity)
-                .where(
-                    and_(
-                        ClientEntity.id == id,
-                        ClientEntity.organization_id == organization_id,
-                        ClientEntity.deleted_at.is_(None),
-                    )
-                )
-                .values(target)
-                .returning(ClientEntity)
+                update(ClientEntity).where(self._and_clause(organization_id, id)).values(target).returning(ClientEntity)
             )
-
             result = self.db_session.session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
             return result
         except SQLAlchemyError as e:
             self.db_session.rollback()
             raise e
+
+    def _and_clause(self, organization_id: UUID, id: UUID) -> ColumnElement[bool]:
+        return and_(
+            ClientEntity.organization_id == organization_id,
+            ClientEntity.id == id,
+            ClientEntity.deleted_at.is_(None),
+        )
