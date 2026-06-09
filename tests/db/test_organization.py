@@ -34,6 +34,20 @@ def test_get_one_not_found(organization_repository: OrganizationRepository) -> N
         assert organization_repository.get_one(uuid4()) is None
 
 
+def test_exists_found(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+) -> None:
+    with organization_repository.db_session:
+        organization_repository.add_one(organization_entity)
+        assert organization_repository.exists(organization_entity.id) is True
+
+
+def test_exists_not_found(organization_repository: OrganizationRepository) -> None:
+    with organization_repository.db_session:
+        assert organization_repository.exists(uuid4()) is False
+
+
 def test_get_one_by_register_id(
     organization_repository: OrganizationRepository,
     organization_entity: OrganizationEntity,

@@ -15,8 +15,7 @@ class ClientService:
     def get_one(self, id: UUID, organization_id: UUID) -> ClientEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
-            clients = repo.get_many(organization_id=organization_id)
-            return next((client for client in clients if client.id == id), None)
+            return repo.get_one(organization_id, id)
 
     def get_many(self, organization_id: UUID, oin: Oin | None = None) -> List[ClientEntity]:
         with self.db.get_db_session() as session:
@@ -43,17 +42,13 @@ class ClientService:
     def delete_one(self, id: UUID, organization_id: UUID) -> ClientEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
-            clients = repo.get_many(organization_id=organization_id)
-            client = next((candidate for candidate in clients if candidate.id == id), None)
-            if client is None:
+            if not repo.exists(organization_id, id):
                 return None
-            return repo.update(organization_id, client.mandate_id, deleted_at=datetime.now())
+            return repo.update(organization_id, id, deleted_at=datetime.now())
 
     def update_one(self, id: UUID, organization_id: UUID, **kwargs: object) -> ClientEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
-            clients = repo.get_many(organization_id=organization_id)
-            client = next((candidate for candidate in clients if candidate.id == id), None)
-            if client is None:
+            if not repo.exists(organization_id, id):
                 return None
-            return repo.update(organization_id, client.mandate_id, **kwargs)
+            return repo.update(organization_id, id, **kwargs)

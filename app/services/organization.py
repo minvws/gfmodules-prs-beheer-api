@@ -20,6 +20,11 @@ class OrganizationService:
         entity.client_certificate = None  # type: ignore
         return entity
 
+    def exists(self, id: UUID) -> bool:
+        with self.db.get_db_session() as session:
+            repo = session.get_repository(OrganizationRepository)
+            return repo.exists(id)
+
     def get_one(self, id: UUID) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)

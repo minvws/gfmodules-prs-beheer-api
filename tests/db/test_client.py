@@ -6,7 +6,7 @@ from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
-from tests.db.conftest import TEST_MANDATE_ID, TEST_OIN
+from tests.db.conftest import TEST_OIN
 
 
 def test_add_one(
@@ -24,7 +24,7 @@ def test_get_one_found(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        result = client_repository.get_one(client_entity.organization_id, client_entity.mandate_id)
+        result = client_repository.get_one(client_entity.organization_id, client_entity.id)
         assert result is not None
         assert result.id == client_entity.id
 
@@ -34,16 +34,34 @@ def test_get_one_not_found(
     client_entity: ClientEntity,
 ) -> None:
     with client_repository.db_session:
-        assert client_repository.get_one(uuid4(), client_entity.mandate_id) is None
+        assert client_repository.get_one(uuid4(), client_entity.id) is None
 
 
-def test_get_one_wrong_mandate(
+def test_get_one_wrong_organization(
     client_repository: ClientRepository,
     client_entity: ClientEntity,
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        assert client_repository.get_one(client_entity.organization_id, "wrong-mandate") is None
+        assert client_repository.get_one(uuid4(), client_entity.id) is None
+
+
+def test_exists_found(
+    client_repository: ClientRepository,
+    client_entity: ClientEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(client_entity)
+        assert client_repository.exists(client_entity.organization_id, client_entity.id) is True
+
+
+def test_exists_not_found(
+    client_repository: ClientRepository,
+    client_entity: ClientEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(client_entity)
+        assert client_repository.exists(uuid4(), client_entity.id) is False
 
 
 def test_update_success(
@@ -52,16 +70,14 @@ def test_update_success(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        result = client_repository.update(
-            client_entity.organization_id, client_entity.mandate_id, common_name="Updated Name"
-        )
+        result = client_repository.update(client_entity.organization_id, client_entity.id, common_name="Updated Name")
         assert result is not None
         assert result.common_name == "Updated Name"
 
 
 def test_update_not_found(client_repository: ClientRepository) -> None:
     with client_repository.db_session:
-        assert client_repository.update(uuid4(), TEST_MANDATE_ID, common_name="Not Found") is None
+        assert client_repository.update(uuid4(), uuid4(), common_name="Not Found") is None
 
 
 def test_get_many_returns_all(
@@ -104,7 +120,7 @@ def test_get_many_excludes_deleted(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        client_repository.update(client_entity.organization_id, client_entity.mandate_id, deleted_at=datetime.now())
+        client_repository.update(client_entity.organization_id, client_entity.id, deleted_at=datetime.now())
         assert client_repository.get_many(organization_id=client_entity.organization_id) == []
 
 
@@ -123,7 +139,7 @@ def test_accessing_organization_raises_lazy_load(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        result = client_repository.get_one(client_entity.organization_id, client_entity.mandate_id)
+        result = client_repository.get_one(client_entity.organization_id, client_entity.id)
         assert result is not None
         with pytest.raises(InvalidRequestError):
             _ = result.organization
