@@ -7,13 +7,13 @@ from sqlalchemy import ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
-from app.db.models.base import Base
+from app.db.models.base import CommonColumns
 
 if TYPE_CHECKING:
     from app.db.models.organization import OrganizationEntity
 
 
-class ClientEntity(Base):
+class ClientEntity(CommonColumns):
     __tablename__ = "clients"
     __table_args__ = (
         Index(

@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, List
 from sqlalchemy import Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.models.base import Base
+from app.db.models.base import CommonColumns
 
 if TYPE_CHECKING:
     from app.db.models.client import ClientEntity
 
 
-class OrganizationEntity(Base):
+class OrganizationEntity(CommonColumns):
     __tablename__ = "organizations"
     __table_args__ = (
         Index(
