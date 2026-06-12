@@ -1,12 +1,10 @@
-from datetime import datetime
-from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
 
 REGISTER_ID_DESCRIPTION = "The identifier of the organization 'OIN' or 'URA'"
 NAME_DESCRIPTION = "The name of the organization"
 SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
-INCLUDE_DELETED_DESCRIPTION = "Include soft-deleted organizations in the results"
 
 
 class OrganizationCreate(BaseModel):
@@ -29,7 +27,5 @@ class OrganizationQueryParams(BaseModel):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Organization(OrganizationCreate):
-    id: UUID
-    created_at: datetime
-    deleted_at: datetime | None = None
+class Organization(Base, OrganizationCreate):
+    pass
