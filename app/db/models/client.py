@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING, Optional
-from uuid import UUID, uuid4
+from typing import TYPE_CHECKING
+from uuid import UUID
 
-from sqlalchemy import TIMESTAMP, ForeignKey, Index, String, func, text
+from sqlalchemy import ForeignKey, Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import Uuid
 
@@ -27,7 +26,6 @@ class ClientEntity(Base):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column("id", Uuid, primary_key=True, default=uuid4)
     organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
     mandate_id: Mapped[str] = mapped_column(
         "mandate_id",
@@ -36,8 +34,5 @@ class ClientEntity(Base):
 
     oin: Mapped[str] = mapped_column("oin", String)  # OIN of the client
     common_name: Mapped[str] = mapped_column("common_name", String)
-    scopes: Mapped[Optional[str]] = mapped_column("scopes", String)
-    created_at: Mapped[datetime] = mapped_column("created_at", TIMESTAMP, server_default=func.now())
-    deleted_at: Mapped[Optional[datetime]] = mapped_column("deleted_at", TIMESTAMP)
 
     organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")

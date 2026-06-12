@@ -2,9 +2,11 @@ from datetime import datetime
 from typing import List
 from uuid import UUID
 
+from app import scope_utils
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from app.services.exceptions import ScopesNotGrantedError
 
 
 class OrganizationService:
@@ -54,3 +56,10 @@ class OrganizationService:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             return repo.update(id, deleted_at=datetime.now())
+
+    def assert_scopes_granted(self, organization_id: UUID, requested: str | None) -> None:
+        organization = self.get_one(organization_id)
+        available = organization.scopes if organization is not None else None
+        if not scope_utils.is_subset(requested, available):
+            ungranted = scope_utils.parse(requested) - scope_utils.parse(available)
+            raise ScopesNotGrantedError(ungranted)

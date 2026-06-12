@@ -2,6 +2,10 @@ from uuid import UUID, uuid4
 
 from app.db.models.organization import OrganizationEntity
 from app.services.organization import OrganizationService
+from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
+
+SECOND_ORG_REG_ID = "test-register-002"
+SECOND_ORG_NAME = "Second Test Organization"
 
 
 def test_create_one_should_succeed(
@@ -21,8 +25,8 @@ def test_create_one_with_scopes(
     organization_service: OrganizationService,
 ) -> None:
     result = organization_service.create_one(
-        register_id="00000099000000001000",
-        name="Scoped Org",
+        register_id=TEST_REGISTER_ID,
+        name=TEST_ORG_NAME,
         scopes="read write",
     )
     assert result.scopes == "read write"
@@ -99,7 +103,7 @@ def test_update_one_scopes(
 def test_update_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
-    result = organization_service.update_one(uuid4(), name="Ghost")
+    result = organization_service.update_one(uuid4(), name="not-found")
     assert result is None
 
 
@@ -118,7 +122,7 @@ def test_get_many_returns_all(
         register_id=organization_entity.register_id,
         name=organization_entity.name,
     )
-    organization_service.create_one(register_id="00000099000000002000", name="Other Org")
+    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
     results = organization_service.get_many()
     assert len(results) == 2
 
@@ -158,7 +162,7 @@ def test_get_many_filters_by_register_id(
         register_id=organization_entity.register_id,
         name=organization_entity.name,
     )
-    organization_service.create_one(register_id="00000099000000002000", name="Other Org")
+    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
 
     results = organization_service.get_many(register_id=organization_entity.register_id)
     assert len(results) == 1
@@ -168,25 +172,25 @@ def test_get_many_filters_by_register_id(
 def test_get_many_filters_by_name(
     organization_service: OrganizationService,
 ) -> None:
-    organization_service.create_one(register_id="00000099000000001000", name="ORG-1")
-    organization_service.create_one(register_id="00000099000000002000", name="ORG-2")
-    results = organization_service.get_many(name="ORG-1")
+    organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
+    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
+    results = organization_service.get_many(name=TEST_ORG_NAME)
     assert len(results) == 1
-    assert results[0].name == "ORG-1"
+    assert results[0].name == TEST_ORG_NAME
 
 
 def test_get_many_filters_by_scopes_contains(
     organization_service: OrganizationService,
 ) -> None:
-    organization_service.create_one(register_id="00000099000000001000", name="ORG-1", scopes="read")
-    organization_service.create_one(register_id="00000099000000002000", name="ORG-2", scopes="read write")
+    organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="read")
+    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME, scopes="read write")
     # "read" is contained in both organizations' scope sets.
     assert len(organization_service.get_many(scopes="read")) == 2
     # "write" only belongs to ORG-2.
     write_only = organization_service.get_many(scopes="write")
     assert len(write_only) == 1
-    assert write_only[0].name == "ORG-2"
+    assert write_only[0].name == SECOND_ORG_NAME
     # Requesting multiple scopes requires all of them to be present.
     both = organization_service.get_many(scopes="read write")
     assert len(both) == 1
-    assert both[0].name == "ORG-2"
+    assert both[0].name == SECOND_ORG_NAME

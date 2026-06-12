@@ -54,8 +54,8 @@ def organization_service(database: Database) -> OrganizationService:
 
 
 @pytest.fixture()
-def client_service(database: Database) -> ClientService:
-    return ClientService(database)
+def client_service(database: Database, organization_service: OrganizationService) -> ClientService:
+    return ClientService(database, organization_service)
 
 
 @pytest.fixture()
