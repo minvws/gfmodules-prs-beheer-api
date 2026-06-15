@@ -20,7 +20,7 @@ def container_config(binder: inject.Binder) -> None:
     organization_service = OrganizationService(db)
     binder.bind(OrganizationService, organization_service)
 
-    client_service = ClientService(db)
+    client_service = ClientService(db, organization_service)
     binder.bind(ClientService, client_service)
 
 

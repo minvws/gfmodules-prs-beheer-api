@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
-from app.db.repository.base import RepositoryBase
+from app.db.repository.base import RepositoryBase, scopes_contains_conditions
 
 
 @repository(OrganizationEntity)
@@ -37,11 +37,24 @@ class OrganizationRepository(RepositoryBase):
         )
         return self.db_session.session.execute(stmt).scalar()
 
-    def get_many(self, register_id: str | None = None) -> Sequence[OrganizationEntity]:
-        conditions: list[ColumnElement[bool]] = [OrganizationEntity.deleted_at.is_(None)]
+    def get_many(
+        self,
+        register_id: str | None = None,
+        name: str | None = None,
+        scopes: str | None = None,
+        include_deleted: bool = False,
+    ) -> Sequence[OrganizationEntity]:
+        conditions: list[ColumnElement[bool]] = []
+        if not include_deleted:
+            conditions.append(OrganizationEntity.deleted_at.is_(None))
         if register_id:
             conditions.append(OrganizationEntity.register_id == register_id)
-        stmt = select(OrganizationEntity).where(and_(*conditions))
+        if name:
+            conditions.append(OrganizationEntity.name == name)
+        conditions.extend(scopes_contains_conditions(OrganizationEntity.scopes, scopes))
+        stmt = select(OrganizationEntity)
+        if conditions:
+            stmt = stmt.where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 
     def update(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:

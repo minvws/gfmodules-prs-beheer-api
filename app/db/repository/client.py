@@ -6,7 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.db.decorator import repository
 from app.db.models.client import ClientEntity
-from app.db.repository.base import RepositoryBase
+from app.db.repository.base import RepositoryBase, scopes_contains_conditions
 
 
 @repository(ClientEntity)
@@ -40,13 +40,25 @@ class ClientRepository(RepositoryBase):
         )
         return self.db_session.session.execute(stmt).scalar()
 
-    def get_many(self, organization_id: UUID, oin: str | None = None) -> Sequence[ClientEntity]:
-        conditions: list[ColumnElement[bool]] = [
-            ClientEntity.organization_id == organization_id,
-            ClientEntity.deleted_at.is_(None),
-        ]
+    def get_many(
+        self,
+        organization_id: UUID,
+        oin: str | None = None,
+        common_name: str | None = None,
+        mandate_id: str | None = None,
+        scopes: str | None = None,
+        include_deleted: bool = False,
+    ) -> Sequence[ClientEntity]:
+        conditions: list[ColumnElement[bool]] = [ClientEntity.organization_id == organization_id]
+        if not include_deleted:
+            conditions.append(ClientEntity.deleted_at.is_(None))
         if oin:
             conditions.append(ClientEntity.oin == oin)
+        if common_name:
+            conditions.append(ClientEntity.common_name == common_name)
+        if mandate_id:
+            conditions.append(ClientEntity.mandate_id == mandate_id)
+        conditions.extend(scopes_contains_conditions(ClientEntity.scopes, scopes))
         stmt = select(ClientEntity).where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 

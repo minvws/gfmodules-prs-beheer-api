@@ -1,50 +1,31 @@
-from datetime import datetime
-from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field
 
-from cryptography import x509
-from pydantic import BaseModel, ConfigDict, field_validator
+from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
 
-from app.models.oin import Oin
-
-
-def _validate_pem_certificate(value: str | None) -> str | None:
-    if value is None:
-        return None
-    try:
-        x509.load_pem_x509_certificate(value.encode())
-    except Exception:
-        raise ValueError("client_certificate must be a valid PEM-encoded X.509 certificate")
-    return value
+REGISTER_ID_DESCRIPTION = "The identifier of the organization 'OIN' or 'URA'"
+NAME_DESCRIPTION = "The name of the organization"
+SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
 
 
 class OrganizationCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    oin: Oin
-    common_name: str
-    client_certificate: str | None = None
-
-    @field_validator("client_certificate")
-    @classmethod
-    def validate_client_certificate(cls, value: str | None) -> str | None:
-        return _validate_pem_certificate(value)
+    register_id: str = Field(..., description=REGISTER_ID_DESCRIPTION)
+    name: str = Field(..., description=NAME_DESCRIPTION)
+    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
 class OrganizationUpdate(BaseModel):
-    common_name: str
-    client_certificate: str | None = None
-
-    @field_validator("client_certificate")
-    @classmethod
-    def validate_client_certificate(cls, value: str | None) -> str | None:
-        return _validate_pem_certificate(value)
+    name: str | None = Field(default=None, description=NAME_DESCRIPTION)
+    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
 
 class OrganizationQueryParams(BaseModel):
-    oin: Oin | None = None
+    register_id: str | None = Field(default=None, description=REGISTER_ID_DESCRIPTION)
+    name: str | None = Field(default=None, description=NAME_DESCRIPTION)
+    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
+    include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Organization(OrganizationCreate):
-    id: UUID
-    created_at: datetime
-    deleted_at: datetime | None = None
+class Organization(Base, OrganizationCreate):
+    pass

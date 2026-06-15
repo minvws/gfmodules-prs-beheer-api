@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.container import get_client_service, get_organization_service
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
 from app.services.client import ClientService
+from app.services.exceptions import ScopesNotGrantedError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -37,24 +38,13 @@ def register(
 ) -> Any:
     try:
         return service.create_one(organization_id=organization_id, **data.model_dump())
+    except ScopesNotGrantedError as error:
+        raise HTTPException(status_code=422, detail=str(error))
     except IntegrityError:
         raise HTTPException(
-            status_code=409, detail="A client with this OIN is already registered for this organization."
+            status_code=409,
+            detail="A client with this mandate_id is already registered for this organization.",
         )
-
-
-@router.get(
-    "",
-    response_model=List[Client],
-    response_model_exclude_none=True,
-    dependencies=[Depends(get_organization_or_404)],
-)
-def get_many(
-    organization_id: UUID,
-    params: Annotated[ClientQueryParams, Query()],
-    service: Annotated[ClientService, Depends(get_client_service)],
-) -> Any:
-    return service.get_many(organization_id=organization_id, **params.model_dump())
 
 
 @router.get(
@@ -74,6 +64,20 @@ def get_by_id(
     return result
 
 
+@router.get(
+    "",
+    response_model=List[Client],
+    response_model_exclude_none=True,
+    dependencies=[Depends(get_organization_or_404)],
+)
+def get_many(
+    organization_id: UUID,
+    params: Annotated[ClientQueryParams, Query()],
+    service: Annotated[ClientService, Depends(get_client_service)],
+) -> Any:
+    return service.get_many(organization_id=organization_id, **params.model_dump())
+
+
 @router.put(
     "/{id}",
     response_model=Client,
@@ -86,7 +90,10 @@ def update(
     body: ClientUpdate,
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
-    result = service.update_one(id, organization_id, **body.model_dump())
+    try:
+        result = service.update_one(id, organization_id, **body.model_dump(exclude_unset=True))
+    except ScopesNotGrantedError as error:
+        raise HTTPException(status_code=422, detail=str(error))
     if result is None:
         raise HTTPException(status_code=404)
     return result

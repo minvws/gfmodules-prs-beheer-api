@@ -1,20 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
-from uuid import UUID, uuid4
+from typing import TYPE_CHECKING, List
 
-from sqlalchemy import TIMESTAMP, Index, String, func, text
+from sqlalchemy import Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import Uuid
 
-from app.db.models.base import Base
+from app.db.models.base import CommonColumns
 
 if TYPE_CHECKING:
     from app.db.models.client import ClientEntity
 
 
-class OrganizationEntity(Base):
+class OrganizationEntity(CommonColumns):
     __tablename__ = "organizations"
     __table_args__ = (
         Index(
@@ -26,14 +23,10 @@ class OrganizationEntity(Base):
         ),
     )
 
-    id: Mapped[UUID] = mapped_column("id", Uuid, primary_key=True, default=uuid4)
     register_id: Mapped[str] = mapped_column(
         "register_id", String
     )  # ID of the organization: {OIN} for PRS - {URA} for NVI
     name: Mapped[str] = mapped_column("name", String)
-    scopes: Mapped[Optional[str]] = mapped_column("scopes", String)
-    created_at: Mapped[datetime] = mapped_column("created_at", TIMESTAMP, server_default=func.now())
-    deleted_at: Mapped[Optional[datetime]] = mapped_column("deleted_at", TIMESTAMP)
 
     clients: Mapped[List["ClientEntity"]] = relationship(
         back_populates="organization", cascade="all, delete-orphan", lazy="raise"

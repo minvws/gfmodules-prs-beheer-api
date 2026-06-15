@@ -6,7 +6,7 @@ from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
-from tests.db.conftest import TEST_OIN
+from tests.conftest import TEST_OIN
 
 
 def test_add_one(
@@ -122,6 +122,18 @@ def test_get_many_excludes_deleted(
         client_repository.add_one(client_entity)
         client_repository.update(client_entity.organization_id, client_entity.id, deleted_at=datetime.now())
         assert client_repository.get_many(organization_id=client_entity.organization_id) == []
+
+
+def test_get_many_include_deleted_returns_deleted(
+    client_repository: ClientRepository,
+    client_entity: ClientEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(client_entity)
+        client_repository.update(client_entity.organization_id, client_entity.id, deleted_at=datetime.now())
+        results = client_repository.get_many(organization_id=client_entity.organization_id, include_deleted=True)
+        assert len(results) == 1
+        assert results[0].id == client_entity.id
 
 
 def test_get_many_scoped_to_organization(
