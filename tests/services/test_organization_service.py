@@ -1,11 +1,21 @@
 from uuid import UUID, uuid4
 
+from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
+from app.models.oin import Oin
 from app.services.organization import OrganizationService
-from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
+from tests.conftest import TEST_OIN, TEST_ORG_NAME, TEST_REGISTER_ID
 
-SECOND_ORG_REG_ID = "test-register-002"
+SECOND_ORG_REG_ID = Oin("00000099000000008000")
 SECOND_ORG_NAME = "Second Test Organization"
+
+
+def test_update_one_ignores_register_id_validation_when_absent(database: Database) -> None:
+    service = OrganizationService(database)
+    created = service.create_one(register_id=TEST_OIN, name=TEST_ORG_NAME)
+    result = service.update_one(created.id, name="Renamed")
+    assert result is not None
+    assert result.name == "Renamed"
 
 
 def test_create_one_should_succeed(

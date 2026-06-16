@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import List
 from uuid import UUID
@@ -6,7 +7,10 @@ from app import scope_utils
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from app.models.oin import Oin
 from app.services.exceptions import ScopesNotGrantedError
+
+logger = logging.getLogger(__name__)
 
 
 class OrganizationService:
@@ -15,7 +19,7 @@ class OrganizationService:
 
     def create_one(
         self,
-        register_id: str,
+        register_id: Oin,
         name: str,
         scopes: str | None = None,
     ) -> OrganizationEntity:
@@ -36,7 +40,7 @@ class OrganizationService:
 
     def get_many(
         self,
-        register_id: str | None = None,
+        register_id: Oin | None = None,
         name: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,
@@ -62,4 +66,9 @@ class OrganizationService:
         available = organization.scopes if organization is not None else None
         if not scope_utils.is_subset(requested, available):
             ungranted = scope_utils.parse(requested) - scope_utils.parse(available)
+            logger.warning(
+                "Requested scopes not granted organization_id=%s missing=%s",
+                organization_id,
+                sorted(ungranted),
+            )
             raise ScopesNotGrantedError(ungranted)

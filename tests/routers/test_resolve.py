@@ -6,10 +6,11 @@ from fastapi.testclient import TestClient
 from tests.conftest import VALID_OIN
 
 RESOLVE = "/clients/resolve"
+ORG_OIN = "00000099000000009000"
 
 
 def _body(**overrides: object) -> dict[str, object]:
-    body: dict[str, object] = {"oin": VALID_OIN, "common_name": "Client", "mandate_id": "mandate-1"}
+    body: dict[str, object] = {"oin": str(VALID_OIN), "common_name": "Client", "org_oin": ORG_OIN}
     body.update(overrides)
     return body
 
@@ -21,11 +22,11 @@ def test_resolve_returns_scopes(api: TestClient, mock_client_service: MagicMock,
     response = api.post(RESOLVE, json=_body())
 
     assert response.status_code == 200
-    assert response.json() == scopes
+    assert response.json().get("scopes") == scopes
     call = mock_client_service.resolve.call_args
-    assert str(call.kwargs["oin"]) == VALID_OIN
+    assert str(call.kwargs["oin"]) == str(VALID_OIN)
     assert call.kwargs["common_name"] == "Client"
-    assert call.kwargs["mandate_id"] == "mandate-1"
+    assert str(call.kwargs["register_id"]) == ORG_OIN
 
 
 def test_resolve_unknown_client_returns_404(api: TestClient, mock_client_service: MagicMock) -> None:
@@ -38,10 +39,10 @@ def test_resolve_unknown_client_returns_404(api: TestClient, mock_client_service
 @pytest.mark.parametrize(
     "body",
     [
-        {"common_name": "C", "mandate_id": "m"},  # missing oin
-        {"oin": VALID_OIN, "mandate_id": "m"},  # missing common_name
-        {"oin": VALID_OIN, "common_name": "C"},  # missing mandate_id
-        {"oin": "invalid-oin", "common_name": "C", "mandate_id": "m"},  # malformed oin
+        {"common_name": "C", "org_oin": ORG_OIN},  # missing oin
+        {"oin": str(VALID_OIN), "org_oin": ORG_OIN},  # missing common_name
+        {"oin": str(VALID_OIN), "common_name": "C"},  # missing org_oin
+        {"oin": "invalid-oin", "common_name": "C", "org_oin": ORG_OIN},  # malformed oin
     ],
 )
 def test_resolve_invalid_body_returns_422(
