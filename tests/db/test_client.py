@@ -5,8 +5,10 @@ import pytest
 from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.client import ClientEntity
+from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
-from tests.conftest import TEST_OIN
+from app.models.oin import Oin
+from tests.conftest import TEST_COMMON_NAME, TEST_OIN
 
 
 def test_add_one(
@@ -86,7 +88,6 @@ def test_get_many_returns_all(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
-        mandate_id="mandate-002",
         oin=TEST_OIN,
         common_name="Another Client",
     )
@@ -102,7 +103,6 @@ def test_get_many_filters_by_oin(
 ) -> None:
     entity_2 = ClientEntity(
         organization_id=client_entity.organization_id,
-        mandate_id="mandate-002",
         oin="00000099000000002000",
         common_name="Another Client",
     )
@@ -155,3 +155,35 @@ def test_accessing_organization_raises_lazy_load(
         assert result is not None
         with pytest.raises(InvalidRequestError):
             _ = result.organization
+
+
+def _client(organization_id: object, *, oin: Oin = TEST_OIN, common_name: str = TEST_COMMON_NAME) -> ClientEntity:
+    return ClientEntity(organization_id=organization_id, oin=oin, common_name=common_name)
+
+
+@pytest.mark.parametrize(
+    "second_oin, second_cn",
+    [
+        (Oin("00000099000000002000"), TEST_COMMON_NAME),  # different oin
+        (TEST_OIN, "Other CN"),  # different common_name
+    ],
+)
+def test_unique_index_allows_distinct_clients(
+    client_repository: ClientRepository,
+    persisted_organization: OrganizationEntity,
+    second_oin: Oin,
+    second_cn: str,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(_client(persisted_organization.id))
+        client_repository.add_one(_client(persisted_organization.id, oin=second_oin, common_name=second_cn))
+        assert len(client_repository.get_many(organization_id=persisted_organization.id)) == 2
+
+
+def test_get_by_credentials_scoped_to_organization(
+    client_repository: ClientRepository,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(_client(persisted_organization.id))
+        assert client_repository.get_by_credentials(uuid4(), TEST_OIN, TEST_COMMON_NAME) is None

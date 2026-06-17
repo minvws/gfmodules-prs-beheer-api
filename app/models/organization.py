@@ -1,8 +1,9 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
+from app.models.oin import Oin
 
-REGISTER_ID_DESCRIPTION = "The identifier of the organization 'OIN' or 'URA'"
+REGISTER_ID_DESCRIPTION = "The OIN of the organization"
 NAME_DESCRIPTION = "The name of the organization"
 SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
 
@@ -10,7 +11,7 @@ SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
 class OrganizationCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    register_id: str = Field(..., description=REGISTER_ID_DESCRIPTION)
+    register_id: Oin = Field(..., description=REGISTER_ID_DESCRIPTION)
     name: str = Field(..., description=NAME_DESCRIPTION)
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
 
@@ -21,7 +22,7 @@ class OrganizationUpdate(BaseModel):
 
 
 class OrganizationQueryParams(BaseModel):
-    register_id: str | None = Field(default=None, description=REGISTER_ID_DESCRIPTION)
+    register_id: Oin | None = Field(default=None, description=REGISTER_ID_DESCRIPTION)
     name: str | None = Field(default=None, description=NAME_DESCRIPTION)
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)

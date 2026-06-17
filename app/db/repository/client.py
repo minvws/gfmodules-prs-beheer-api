@@ -7,6 +7,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.db.decorator import repository
 from app.db.models.client import ClientEntity
 from app.db.repository.base import RepositoryBase, scopes_contains_conditions
+from app.models.oin import Oin
 
 
 @repository(ClientEntity)
@@ -28,24 +29,23 @@ class ClientRepository(RepositoryBase):
         stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
         return bool(self.db_session.session.execute(stmt).scalar())
 
-    def get_by_credentials(self, common_name: str, oin: str, mandate_id: str) -> ClientEntity | None:
-        """Look up a client by the credentials used in an OAuth resolve request."""
+    def get_by_credentials(self, organization_id: UUID, oin: Oin, common_name: str) -> ClientEntity | None:
         stmt = select(ClientEntity).where(
             and_(
-                ClientEntity.common_name == common_name,
+                ClientEntity.organization_id == organization_id,
                 ClientEntity.oin == oin,
-                ClientEntity.mandate_id == mandate_id,
+                ClientEntity.common_name == common_name,
                 ClientEntity.deleted_at.is_(None),
             )
         )
-        return self.db_session.session.execute(stmt).scalar()
+
+        return self.db_session.session.execute(stmt).scalar_one_or_none()
 
     def get_many(
         self,
         organization_id: UUID,
-        oin: str | None = None,
+        oin: Oin | None = None,
         common_name: str | None = None,
-        mandate_id: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,
     ) -> Sequence[ClientEntity]:
@@ -56,8 +56,6 @@ class ClientRepository(RepositoryBase):
             conditions.append(ClientEntity.oin == oin)
         if common_name:
             conditions.append(ClientEntity.common_name == common_name)
-        if mandate_id:
-            conditions.append(ClientEntity.mandate_id == mandate_id)
         conditions.extend(scopes_contains_conditions(ClientEntity.scopes, scopes))
         stmt = select(ClientEntity).where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()

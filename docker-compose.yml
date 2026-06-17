@@ -16,7 +16,6 @@ services:
       - 8512:8512
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8512/health"]
-      interval: 5s
       timeout: 10s
       retries: 5
       start_period: 5s

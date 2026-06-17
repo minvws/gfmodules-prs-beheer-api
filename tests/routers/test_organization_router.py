@@ -15,7 +15,7 @@ def test_register_returns_201(api: TestClient, mock_organization_service: MagicM
     entity = make_organization_entity(register_id=VALID_OIN, name="Org", scopes=scopes)
     mock_organization_service.create_one.return_value = entity
 
-    body: dict[str, object] = {"register_id": VALID_OIN, "name": "Org"}
+    body: dict[str, object] = {"register_id": str(VALID_OIN), "name": "Org"}
     if scopes is not None:
         body["scopes"] = scopes
     response = api.post("/organizations", json=body)
@@ -23,14 +23,14 @@ def test_register_returns_201(api: TestClient, mock_organization_service: MagicM
     assert response.status_code == 201
     data = response.json()
     assert data["id"] == str(entity.id)
-    assert data["register_id"] == VALID_OIN
+    assert data["register_id"] == str(VALID_OIN)
     assert data["name"] == "Org"
     mock_organization_service.create_one.assert_called_once_with(register_id=VALID_OIN, name="Org", scopes=scopes)
 
 
 def test_register_conflict_returns_409(api: TestClient, mock_organization_service: MagicMock) -> None:
     mock_organization_service.create_one.side_effect = IntegrityError("stmt", {}, Exception("duplicate"))
-    response = api.post("/organizations", json={"register_id": VALID_OIN, "name": "Org"})
+    response = api.post("/organizations", json={"register_id": str(VALID_OIN), "name": "Org"})
     assert response.status_code == 409
 
 
@@ -38,9 +38,9 @@ def test_register_conflict_returns_409(api: TestClient, mock_organization_servic
     "body",
     [
         {"name": "Org"},  # missing register_id
-        {"register_id": VALID_OIN},  # missing name
+        {"register_id": str(VALID_OIN)},  # missing name
         {},  # missing everything
-        {"register_id": VALID_OIN, "name": ["not", "a", "string"]},  # wrong type
+        {"register_id": str(VALID_OIN), "name": ["not", "a", "string"]},  # wrong type
     ],
 )
 def test_register_invalid_body_returns_422(
@@ -92,7 +92,10 @@ def test_get_many_without_params_uses_defaults(api: TestClient, mock_organizatio
 @pytest.mark.parametrize(
     "query, expected",
     [
-        ("register_id=reg-1", {"register_id": "reg-1", "name": None, "scopes": None, "include_deleted": False}),
+        (
+            f"register_id={VALID_OIN}",
+            {"register_id": VALID_OIN, "name": None, "scopes": None, "include_deleted": False},
+        ),
         ("name=Acme", {"register_id": None, "name": "Acme", "scopes": None, "include_deleted": False}),
         ("scopes=read+write", {"register_id": None, "name": None, "scopes": "read write", "include_deleted": False}),
         ("include_deleted=true", {"register_id": None, "name": None, "scopes": None, "include_deleted": True}),

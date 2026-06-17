@@ -5,8 +5,10 @@ from uuid import UUID, uuid4
 
 import pytest
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
 
+from app.application import request_validation_exception_handler
 from app.config import ConfigDatabase
 from app.container import get_client_service, get_organization_service
 from app.db.db import Database
@@ -14,16 +16,16 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.models.oin import Oin
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 
-TEST_OIN = "00000099000000001000"
-TEST_REGISTER_ID = "test-register-001"
+TEST_OIN = Oin("00000099000000001000")
+TEST_REGISTER_ID = Oin("00000099000000009000")
 TEST_ORG_NAME = "Test Organization"
-TEST_MANDATE_ID = "mandate-001"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
 FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
@@ -54,7 +56,10 @@ def organization_service(database: Database) -> OrganizationService:
 
 
 @pytest.fixture()
-def client_service(database: Database, organization_service: OrganizationService) -> ClientService:
+def client_service(
+    database: Database,
+    organization_service: OrganizationService,
+) -> ClientService:
     return ClientService(database, organization_service)
 
 
@@ -72,7 +77,6 @@ def persisted_organization(organization_service: OrganizationService) -> Organiz
 def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
     return ClientEntity(
         organization_id=persisted_organization.id,
-        mandate_id=TEST_MANDATE_ID,
         oin=TEST_OIN,
         common_name=TEST_COMMON_NAME,
     )
@@ -93,6 +97,7 @@ def mock_organization_service() -> MagicMock:
 @pytest.fixture()
 def api(mock_client_service: MagicMock, mock_organization_service: MagicMock) -> TestClient:
     app = FastAPI()
+    app.exception_handler(RequestValidationError)(request_validation_exception_handler)
     for router in (organization_router, client_router, resolve_router):
         app.include_router(router)
     app.dependency_overrides[get_client_service] = lambda: mock_client_service
@@ -103,7 +108,7 @@ def api(mock_client_service: MagicMock, mock_organization_service: MagicMock) ->
 def make_organization_entity(
     *,
     id: UUID | None = None,
-    register_id: str = VALID_OIN,
+    register_id: Oin = VALID_OIN,
     name: str = "Test Organization",
     scopes: str | None = None,
     deleted_at: datetime | None = None,
@@ -122,9 +127,8 @@ def make_client_entity(
     *,
     id: UUID | None = None,
     organization_id: UUID | None = None,
-    oin: str = VALID_OIN,
+    oin: Oin = VALID_OIN,
     common_name: str = "Test Client",
-    mandate_id: str = "mandate-1",
     scopes: str | None = None,
     deleted_at: datetime | None = None,
 ) -> ClientEntity:
@@ -133,7 +137,6 @@ def make_client_entity(
         organization_id=organization_id or uuid4(),
         oin=oin,
         common_name=common_name,
-        mandate_id=mandate_id,
         scopes=scopes,
         created_at=FIXED_CREATED_AT,
         deleted_at=deleted_at,
