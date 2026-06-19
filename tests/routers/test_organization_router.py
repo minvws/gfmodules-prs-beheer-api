@@ -1,6 +1,8 @@
+from typing import Any, Generator
 from unittest.mock import MagicMock
 from uuid import UUID
 
+import inject
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +10,13 @@ from sqlalchemy.exc import IntegrityError
 from tests.conftest import VALID_OIN, make_organization_entity
 
 ORG_ID = "11111111-1111-1111-1111-111111111111"
+
+
+@pytest.fixture(autouse=True)
+def configure_allowed_scopes() -> Generator[Any, Any, Any]:
+    inject.clear_and_configure(lambda binder: binder.bind("allowed_scopes", {"read", "write"}))
+    yield
+    inject.clear()
 
 
 @pytest.mark.parametrize("scopes", [None, "read write"])
@@ -48,6 +57,13 @@ def test_register_invalid_body_returns_422(
 ) -> None:
     response = api.post("/organizations", json=body)
     assert response.status_code == 422
+    mock_organization_service.create_one.assert_not_called()
+
+
+def test_register_disallowed_scopes_returns_422(api: TestClient, mock_organization_service: MagicMock) -> None:
+    response = api.post("/organizations", json={"register_id": str(VALID_OIN), "name": "Org", "scopes": "admin"})
+    assert response.status_code == 422
+    assert "Requested scopes admin are not allowed" in response.text
     mock_organization_service.create_one.assert_not_called()
 
 

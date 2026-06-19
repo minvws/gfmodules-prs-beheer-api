@@ -32,3 +32,25 @@ def test_is_subset_empty_child_is_always_subset() -> None:
 
 def test_is_subset_false() -> None:
     assert scope_utils.is_subset("read delete", "read write") is False
+
+
+def test_check_in_configured_scopes_true() -> None:
+    configured = {"read", "write"}
+    assert scope_utils.check_in_configured_scopes(configured, "read") is True
+    assert scope_utils.check_in_configured_scopes(configured, "write") is True
+    assert scope_utils.check_in_configured_scopes(configured, "read write") is True
+    assert scope_utils.check_in_configured_scopes(configured, None) is True
+    assert scope_utils.check_in_configured_scopes(configured, "") is True
+
+
+def test_check_in_configured_scopes_false() -> None:
+    configured = {"read", "write"}
+    assert scope_utils.check_in_configured_scopes(configured, "delete") is False
+    assert scope_utils.check_in_configured_scopes(configured, "read delete") is False
+
+
+def test_check_in_configured_scopes_empty_configured() -> None:
+    configured: set[str] = set()
+    assert scope_utils.check_in_configured_scopes(configured, "read") is False
+    assert scope_utils.check_in_configured_scopes(configured, None) is True
+    assert scope_utils.check_in_configured_scopes(configured, "") is True
