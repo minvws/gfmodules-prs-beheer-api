@@ -4,7 +4,7 @@ import os
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,14 @@ class LogLevel(str, Enum):
 
 class ConfigApp(BaseModel):
     loglevel: LogLevel = Field(default=LogLevel.info)
+    scopes: set[str] = Field(default=set(), description="The possible space separated scopes")
+
+    @field_validator("scopes", mode="before")
+    def validate_scopes(cls, value: str) -> set[str]:
+        if not isinstance(value, str):
+            raise ValueError("Scopes must be a string")
+        split = value.split()
+        return set(split.strip() for split in split)
 
 
 class ConfigDatabase(BaseModel):

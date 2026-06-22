@@ -1,6 +1,8 @@
 [app]
 # Loglevel can be one of: debug, info, warning, error, critical
 loglevel=debug
+# Possible scopes for which a PRS-client can be authorized
+scopes = read write delete admin
 
 [database]
 # Dsn for database connection
