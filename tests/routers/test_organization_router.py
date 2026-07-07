@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 
+from app.services.exceptions import OrganizationHasClientsError, ScopesInUseError
 from tests.conftest import VALID_OIN, make_organization_entity
 
 ORG_ID = "11111111-1111-1111-1111-111111111111"
@@ -162,6 +163,13 @@ def test_update_forwards_only_supplied_fields(
     mock_organization_service.update_one.assert_called_once_with(UUID(ORG_ID), **expected_kwargs)
 
 
+def test_update_scopes_in_use_returns_409(api: TestClient, mock_organization_service: MagicMock) -> None:
+    mock_organization_service.update_one.side_effect = ScopesInUseError({"read"})
+    response = api.put(f"/organizations/{ORG_ID}", json={"scopes": "write"})
+    assert response.status_code == 409
+    assert "Scopes still in use by one or more clients: read" in response.text
+
+
 def test_update_invalid_uuid_returns_422(api: TestClient) -> None:
     response = api.put("/organizations/not-a-uuid", json={"name": "X"})
     assert response.status_code == 422
@@ -173,6 +181,13 @@ def test_delete_returns_204(api: TestClient, mock_organization_service: MagicMoc
     assert response.status_code == 204
     assert response.content == b""
     mock_organization_service.delete_one.assert_called_once_with(UUID(ORG_ID))
+
+
+def test_delete_with_active_clients_returns_409(api: TestClient, mock_organization_service: MagicMock) -> None:
+    mock_organization_service.delete_one.side_effect = OrganizationHasClientsError()
+    response = api.delete(f"/organizations/{ORG_ID}")
+    assert response.status_code == 409
+    assert "Organization still has one or more active clients" in response.text
 
 
 def test_delete_not_found_returns_404(api: TestClient, mock_organization_service: MagicMock) -> None:

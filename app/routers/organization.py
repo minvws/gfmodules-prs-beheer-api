@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.container import get_organization_service
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
+from app.services.exceptions import OrganizationHasClientsError, ScopesInUseError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,11 @@ def update(
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
     logger.debug("Updating organization id=%s fields=%s", id, list(body.model_dump(exclude_unset=True).keys()))
-    result = service.update_one(id, **body.model_dump(exclude_unset=True))
+    try:
+        result = service.update_one(id, **body.model_dump(exclude_unset=True))
+    except ScopesInUseError as error:
+        logger.warning("Organization update rejected id=%s: %s", id, error)
+        raise HTTPException(status_code=409, detail=str(error))
     if result is None:
         logger.debug("Organization not found for update id=%s", id)
         raise HTTPException(status_code=404)
@@ -74,7 +79,11 @@ def delete(
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Response:
     logger.debug("Deleting organization id=%s", id)
-    result = service.delete_one(id)
+    try:
+        result = service.delete_one(id)
+    except OrganizationHasClientsError as error:
+        logger.warning("Organization delete rejected id=%s: %s", id, error)
+        raise HTTPException(status_code=409, detail=str(error))
     if result is None:
         logger.debug("Organization not found for delete id=%s", id)
         raise HTTPException(status_code=404)
