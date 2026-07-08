@@ -19,11 +19,11 @@ def streams() -> Iterator[tuple[logging.Logger, io.StringIO, io.StringIO]]:
 
     app_handler = logging.StreamHandler(app_buf)
     app_handler.addFilter(AppFilter())
-    app_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.APP))
+    app_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.APP, stream_id="app"))
 
     siem_handler = logging.StreamHandler(siem_buf)
     siem_handler.addFilter(SiemFilter())
-    siem_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.SIEM))
+    siem_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.SIEM, stream_id="siem"))
 
     logger = logging.getLogger("app.test_stream_routing")
     logger.setLevel(logging.DEBUG)
@@ -46,8 +46,20 @@ def streams() -> Iterator[tuple[logging.Logger, io.StringIO, io.StringIO]]:
         method_var.reset(tokens[3])
 
 
+def _records(buf: io.StringIO) -> list[dict[str, Any]]:
+    return [json.loads(line) for line in buf.getvalue().splitlines()]
+
+
 def _messages(buf: io.StringIO) -> list[dict[str, Any]]:
-    return [json.loads(line)["message"] for line in buf.getvalue().splitlines()]
+    return [record["message"] for record in _records(buf)]
+
+
+def test_records_carry_stream_id(streams: tuple[logging.Logger, io.StringIO, io.StringIO]) -> None:
+    logger, app_buf, siem_buf = streams
+    Log.event(logger, Log.ORGANIZATION_REGISTERED, "registered", organisatie_oin="00000099000000001000")
+
+    assert _records(app_buf)[0]["stream_id"] == "app"
+    assert _records(siem_buf)[0]["stream_id"] == "siem"
 
 
 def test_organization_registered_withholds_bevoegdheden_from_siem(

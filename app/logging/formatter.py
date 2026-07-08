@@ -67,8 +67,12 @@ def _collect_extras(record: logging.LogRecord) -> dict[str, Any]:
 class JsonFormatter(logging.Formatter):
     """Structured JSON formatter for the debug-json view.
 
+    All streams share a single syslog channel; ``stream_id`` tells the log
+    server which stream (app, siem, public_inspect, debug) a record belongs to.
+
     Example output:
         {
+            "stream_id": "app",
             "event_id": "260400",
             "timestamp": "2026-04-23T10:11:12Z",
             "level": "INFO",
@@ -82,10 +86,16 @@ class JsonFormatter(logging.Formatter):
         }
     """
 
-    def __init__(self, include_traces: bool = True, stream: LoggingStreams | None = None) -> None:
+    def __init__(
+        self,
+        include_traces: bool = True,
+        stream: LoggingStreams | None = None,
+        stream_id: str | None = None,
+    ) -> None:
         super().__init__()
         self.include_traces = include_traces
         self.stream = stream
+        self.stream_id = stream_id
 
     def format(self, record: logging.LogRecord) -> str:
         message: dict[str, Any] = {}
@@ -105,6 +115,8 @@ class JsonFormatter(logging.Formatter):
             "event_description": _sanitize_message(record.getMessage()),
             "source": f"{record.module}:{record.lineno}",
         }
+        if self.stream_id is not None:
+            log_record["stream_id"] = self.stream_id
         log_record["message"] = message
 
         return json.dumps(log_record, default=str)
