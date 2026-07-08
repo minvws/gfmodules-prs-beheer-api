@@ -1,10 +1,14 @@
 from uuid import UUID, uuid4
 
+import pytest
+
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.models.oin import Oin
+from app.services.client import ClientService
+from app.services.exceptions import OrganizationHasClientsError, ScopesInUseError
 from app.services.organization import OrganizationService
-from tests.conftest import TEST_OIN, TEST_ORG_NAME, TEST_REGISTER_ID
+from tests.conftest import TEST_COMMON_NAME, TEST_OIN, TEST_ORG_NAME, TEST_REGISTER_ID
 
 SECOND_ORG_REG_ID = Oin("00000099000000008000")
 SECOND_ORG_NAME = "Second Test Organization"
@@ -76,6 +80,45 @@ def test_delete_one_soft_deletes(
     assert result is None
 
 
+@pytest.mark.parametrize("client_scopes", [None, "baz"])
+def test_delete_one_blocked_when_active_client_exists(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    client_scopes: str | None,
+) -> None:
+    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
+    client_service.create_one(
+        organization_id=created.id,
+        oin=TEST_OIN,
+        common_name=TEST_COMMON_NAME,
+        scopes=client_scopes,
+    )
+
+    with pytest.raises(OrganizationHasClientsError):
+        organization_service.delete_one(created.id)
+
+    persisted = organization_service.get_one(created.id)
+    assert persisted is not None
+    assert persisted.deleted_at is None
+
+
+def test_delete_one_allowed_when_clients_are_deleted(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+) -> None:
+    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
+    client = client_service.create_one(
+        organization_id=created.id,
+        oin=TEST_OIN,
+        common_name=TEST_COMMON_NAME,
+        scopes="baz",
+    )
+    client_service.delete_one(client.id, created.id)
+
+    organization_service.delete_one(created.id)
+    assert organization_service.get_one(created.id) is None
+
+
 def test_delete_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
@@ -108,6 +151,85 @@ def test_update_one_scopes(
     result = organization_service.update_one(created.id, scopes="read write")
     assert result is not None
     assert result.scopes == "read write"
+
+
+def test_update_one_scope_can_be_removed_and_added_back(
+    organization_service: OrganizationService,
+    organization_entity: OrganizationEntity,
+) -> None:
+    created = organization_service.create_one(
+        register_id=organization_entity.register_id,
+        name=organization_entity.name,
+        scopes="foo bar baz",
+    )
+
+    removed = organization_service.update_one(created.id, scopes="foo bar")
+    assert removed is not None
+    assert removed.scopes == "foo bar"
+
+    added_back = organization_service.update_one(created.id, scopes="foo bar baz")
+    assert added_back is not None
+    assert added_back.scopes == "foo bar baz"
+
+    persisted = organization_service.get_one(created.id)
+    assert persisted is not None
+    assert persisted.scopes == "foo bar baz"
+
+
+def test_update_one_scope_removal_blocked_when_used_by_client(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+) -> None:
+    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
+    client_service.create_one(
+        organization_id=created.id,
+        oin=TEST_OIN,
+        common_name=TEST_COMMON_NAME,
+        scopes="baz",
+    )
+
+    with pytest.raises(ScopesInUseError, match="baz"):
+        organization_service.update_one(created.id, scopes="foo bar")
+
+    persisted = organization_service.get_one(created.id)
+    assert persisted is not None
+    assert persisted.scopes == "foo bar baz"
+
+
+def test_update_one_scope_removal_allowed_when_client_no_longer_uses_it(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+) -> None:
+    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
+    client = client_service.create_one(
+        organization_id=created.id,
+        oin=TEST_OIN,
+        common_name=TEST_COMMON_NAME,
+        scopes="baz",
+    )
+    client_service.update_one(client.id, created.id, scopes="foo")
+
+    result = organization_service.update_one(created.id, scopes="foo bar")
+    assert result is not None
+    assert result.scopes == "foo bar"
+
+
+def test_update_one_scope_removal_ignores_deleted_clients(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+) -> None:
+    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
+    client = client_service.create_one(
+        organization_id=created.id,
+        oin=TEST_OIN,
+        common_name=TEST_COMMON_NAME,
+        scopes="baz",
+    )
+    client_service.delete_one(client.id, created.id)
+
+    result = organization_service.update_one(created.id, scopes="foo bar")
+    assert result is not None
+    assert result.scopes == "foo bar"
 
 
 def test_update_one_returns_none_when_not_found(

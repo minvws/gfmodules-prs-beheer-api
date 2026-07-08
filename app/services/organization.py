@@ -8,7 +8,7 @@ from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
 from app.models.oin import Oin
-from app.services.exceptions import ScopesNotGrantedError
+from app.services.exceptions import OrganizationHasClientsError, ScopesInUseError, ScopesNotGrantedError
 
 logger = logging.getLogger(__name__)
 
@@ -54,11 +54,40 @@ class OrganizationService:
     def update_one(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
+            if "scopes" in kwargs:
+                self._assert_removed_scopes_unused(repo, id, kwargs["scopes"])  # type: ignore[arg-type]
             return repo.update(id, **kwargs)
+
+    def _assert_removed_scopes_unused(self, repo: OrganizationRepository, id: UUID, new_scopes: str | None) -> None:
+        current = repo.get_one_with_clients(id)
+        if current is None:
+            return
+        removed = scope_utils.parse(current.scopes) - scope_utils.parse(new_scopes)
+        if not removed:
+            return
+        in_use = removed & {
+            scope
+            for client in current.clients
+            if client.deleted_at is None
+            for scope in scope_utils.parse(client.scopes)
+        }
+        if in_use:
+            logger.warning(
+                "Cannot remove scopes still in use by clients organization_id=%s scopes=%s",
+                id,
+                sorted(in_use),
+            )
+            raise ScopesInUseError(in_use)
 
     def delete_one(self, id: UUID) -> OrganizationEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
+            organization = repo.get_one_with_clients(id)
+            if organization is None:
+                return None
+            if any(client.deleted_at is None for client in organization.clients):
+                logger.warning("Cannot delete organization with active clients organization_id=%s", id)
+                raise OrganizationHasClientsError()
             return repo.update(id, deleted_at=datetime.now())
 
     def assert_scopes_granted(self, organization_id: UUID, requested: str | None) -> None:

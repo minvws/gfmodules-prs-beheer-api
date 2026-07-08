@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, update
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import selectinload
 
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
@@ -23,6 +24,12 @@ class OrganizationRepository(RepositoryBase):
 
     def get_one(self, id: UUID) -> OrganizationEntity | None:
         stmt = select(OrganizationEntity).where(self._and_clause(id))
+        return self.db_session.session.execute(stmt).scalar()
+
+    def get_one_with_clients(self, id: UUID) -> OrganizationEntity | None:
+        """Fetch an organization with its clients eagerly loaded (the relationship
+        is ``lazy="raise"``). Includes soft-deleted clients; filter on ``deleted_at``."""
+        stmt = select(OrganizationEntity).options(selectinload(OrganizationEntity.clients)).where(self._and_clause(id))
         return self.db_session.session.execute(stmt).scalar()
 
     def exists(self, id: UUID) -> bool:
