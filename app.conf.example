@@ -4,6 +4,22 @@ loglevel=debug
 # Possible scopes for which a PRS-client can be authorized
 scopes = read write delete admin
 
+[logging]
+# All keys are optional. When a syslog path is omitted that stream is simply not emitted.
+# Syslog addresses in host:port format (UDP).
+# Application logs (stroom 2) — also go to stdout.
+app_path=
+# SIEM logs (stroom 3)
+siem_path=
+# Public inspection logs
+public_inspect_path=
+# Debug logs (everything, including traces)
+debug_path=
+# Include stack traces in the JSON logs
+include_traces=True
+# Log everything as plain text to the console (for local development)
+debug_logs_in_console=True
+
 [database]
 # Dsn for database connection
 dsn=postgresql+psycopg://postgres:postgres@postgres:5432/postgres
