@@ -123,6 +123,13 @@ class LogConfigBuilder:
             "root": {"handlers": ["console"], "level": self.loglevel},
         }
 
+        # Stamp every JSON record with the configured application id so the
+        # log server can tell apart applications sharing the syslog channel.
+        if self.logging_config.application_id:
+            for formatter in conf["formatters"].values():
+                if formatter["()"] is JsonFormatter:
+                    formatter["application_id"] = self.logging_config.application_id
+
         self._add_log_handlers(conf)
 
         return conf

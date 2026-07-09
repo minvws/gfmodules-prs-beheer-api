@@ -68,10 +68,12 @@ class JsonFormatter(logging.Formatter):
     """Structured JSON formatter for the debug-json view.
 
     All streams share a single syslog channel; ``stream_id`` tells the log
-    server which stream (app, siem, public_inspect, debug) a record belongs to.
+    server which stream (app, siem, public_inspect, debug) a record belongs
+    to, and ``application_id`` which application emitted it.
 
     Example output:
         {
+            "application_id": "prs-beheer-api",
             "stream_id": "app",
             "event_id": "260400",
             "timestamp": "2026-04-23T10:11:12Z",
@@ -91,11 +93,13 @@ class JsonFormatter(logging.Formatter):
         include_traces: bool = True,
         stream: LoggingStreams | None = None,
         stream_id: str | None = None,
+        application_id: str | None = None,
     ) -> None:
         super().__init__()
         self.include_traces = include_traces
         self.stream = stream
         self.stream_id = stream_id
+        self.application_id = application_id
 
     def format(self, record: logging.LogRecord) -> str:
         message: dict[str, Any] = {}
@@ -115,6 +119,8 @@ class JsonFormatter(logging.Formatter):
             "event_description": _sanitize_message(record.getMessage()),
             "source": f"{record.module}:{record.lineno}",
         }
+        if self.application_id is not None:
+            log_record["application_id"] = self.application_id
         if self.stream_id is not None:
             log_record["stream_id"] = self.stream_id
         log_record["message"] = message

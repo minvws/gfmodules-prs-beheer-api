@@ -36,6 +36,7 @@ class ConfigApp(BaseModel):
 
 class ConfigLogging(BaseModel):
     syslog_path: str | None = Field(default=None)
+    application_id: str | None = Field(default=None)
     include_traces: bool = Field(default=True)
     debug_logs_in_console: bool = Field(default=False)
 
