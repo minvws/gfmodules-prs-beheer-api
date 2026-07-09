@@ -10,6 +10,9 @@ scopes = read write delete admin
 # public_inspect, debug) are sent here; each JSON record carries a stream_id
 # field so the log server can tell them apart.
 syslog_path=
+# Identifies this application in the JSON records (application_id field),
+# so the log server can tell apart applications sharing the channel.
+application_id=prs-beheer-api
 # Include stack traces in the JSON logs
 include_traces=True
 # Log everything as plain text to the console (for local development)

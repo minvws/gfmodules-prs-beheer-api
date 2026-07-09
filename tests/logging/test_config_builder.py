@@ -31,3 +31,19 @@ def test_all_streams_share_the_single_syslog_channel() -> None:
 def test_app_logger_gets_all_streams() -> None:
     conf = _build(syslog_path="logserver:514")
     assert set(conf["loggers"]["app"]["handlers"]) == {"console", *_SYSLOG_HANDLERS}
+
+
+def test_application_id_is_stamped_on_all_json_formatters() -> None:
+    conf = _build(syslog_path="logserver:514", application_id="prs-beheer-api")
+
+    for name, formatter in conf["formatters"].items():
+        if name == "plain":
+            assert "application_id" not in formatter
+        else:
+            assert formatter["application_id"] == "prs-beheer-api"
+
+
+def test_no_application_id_without_config() -> None:
+    conf = _build(syslog_path="logserver:514")
+    for formatter in conf["formatters"].values():
+        assert "application_id" not in formatter
