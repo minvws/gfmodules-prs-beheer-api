@@ -11,31 +11,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clients", tags=["Clients"])
 
 
-@router.post("/resolve", response_model=ClientResolveResponse, status_code=200)
+@router.post("/resolve", response_model=ClientResolveResponse, response_model_exclude_none=True, status_code=200)
 def resolve(
     data: Annotated[ClientResolveRequest, Body()],
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
-    logger.debug(
-        "Resolving client scopes oin=%s common_name=%s org_oin=%s",
-        data.oin,
-        data.common_name,
-        data.org_oin,
-    )
-    scopes = service.resolve(
+    client = service.resolve(
         oin=data.oin,
         common_name=data.common_name,
         register_id=data.org_oin,
     )
-
-    if scopes is None:
-        logger.debug(
-            "Client resolve failed oin=%s common_name=%s org_oin=%s",
-            data.oin,
-            data.common_name,
-            data.org_oin,
-        )
+    if client is None or client.scopes is None:
+        logger.warning("Client not found or has no granted scopes")
         raise HTTPException(status_code=404, detail="Client not found.")
 
-    logger.debug("Client scopes resolved successfully for oin=%s", data.oin)
-    return ClientResolveResponse(scopes=scopes)
+    return client

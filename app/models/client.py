@@ -9,6 +9,7 @@ COMMON_NAME_DESCRIPTION = "The certificate CN of the client"
 OIN_DESCRIPTION = "The OIN of the client"
 ORG_OIN_DESCRIPTION = "The OIN identifier of the mandating organization"
 SCOPES_DESCRIPTION = "The space separated scopes granted to the client"
+ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on behalf of"
 
 
 class ClientCreate(BaseModel):
@@ -44,4 +45,6 @@ class ClientResolveRequest(BaseModel):
 
 
 class ClientResolveResponse(BaseModel):
-    scopes: str = Field(..., description=SCOPES_DESCRIPTION)
+    model_config = ConfigDict(from_attributes=True)
+    scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
+    organization_name: str | None = Field(default=None, description=ORGANIZATION_NAME_DESCRIPTION)
