@@ -22,7 +22,12 @@ def resolve(
         register_id=data.org_oin,
     )
     if client is None or client.scopes is None:
-        logger.warning("Client not found or has no granted scopes")
+        logger.warning(
+            "Client not found or has no granted scopes: client_oin=%s common_name=%s org_oin=%s",
+            data.oin,
+            data.common_name,
+            data.org_oin,
+        )
         raise HTTPException(status_code=404, detail="Client not found.")
 
     return client
