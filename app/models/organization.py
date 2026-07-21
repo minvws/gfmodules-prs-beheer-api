@@ -16,8 +16,10 @@ class Scopes(BaseModel):
     @field_validator("scopes", mode="before")
     @classmethod
     def is_allowed(cls, value: str | None) -> str | None:
-        if not check_in_configured_scopes(get_allowed_scopes(), value):
-            raise ValueError(f"Requested scopes {value} are not allowed")
+        allowed_scopes = get_allowed_scopes()
+        if not check_in_configured_scopes(allowed_scopes, value):
+            supported = " ".join(sorted(allowed_scopes))
+            raise ValueError(f"Requested scopes {value} are not allowed. Supported scopes are {supported}")
         return value
 
 
