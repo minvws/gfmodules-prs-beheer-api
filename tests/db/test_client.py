@@ -186,4 +186,22 @@ def test_get_by_credentials_scoped_to_organization(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(_client(persisted_organization.id))
-        assert client_repository.get_by_credentials(uuid4(), TEST_OIN, TEST_COMMON_NAME) is None
+        assert (
+            client_repository.get_by_credentials(
+                common_name=TEST_COMMON_NAME, oin=TEST_OIN, register_id=Oin("00000099000000008000")
+            )
+            is None
+        )
+
+
+def test_get_by_credentials_returns_client_with_organization(
+    client_repository: ClientRepository,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    with client_repository.db_session:
+        client_repository.add_one(_client(persisted_organization.id))
+        result = client_repository.get_by_credentials(
+            common_name=TEST_COMMON_NAME, oin=TEST_OIN, register_id=persisted_organization.register_id
+        )
+        assert result is not None
+        assert result.organization_name == persisted_organization.name

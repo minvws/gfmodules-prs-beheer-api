@@ -6,7 +6,6 @@ from uuid import UUID
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.repository.client import ClientRepository
-from app.db.repository.organization import OrganizationRepository
 from app.models.oin import Oin
 from app.services.organization import OrganizationService
 
@@ -102,25 +101,7 @@ class ClientService:
         oin: Oin,
         common_name: str,
         register_id: Oin,
-    ) -> str | None:
+    ) -> ClientEntity | None:
         with self.db.get_db_session() as session:
-            org_repo = session.get_repository(OrganizationRepository)
-            organization = org_repo.get_one_by_register_id(register_id)
-            if organization is None:
-                logger.debug("Organization not found register_id=%s", register_id)
-                return None
-            client_repo = session.get_repository(ClientRepository)
-            result = client_repo.get_by_credentials(
-                organization_id=organization.id,
-                oin=oin,
-                common_name=common_name,
-            )
-            if result is None:
-                logger.debug(
-                    "Client not found organization_id=%s oin=%s",
-                    organization.id,
-                    oin,
-                )
-            else:
-                logger.debug("Client found organization_id=%s", organization.id)
-            return result.scopes if result is not None else None
+            repo = session.get_repository(ClientRepository)
+            return repo.get_by_credentials(common_name=common_name, oin=oin, register_id=register_id)

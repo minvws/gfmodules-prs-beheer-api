@@ -3,9 +3,11 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, update
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import joinedload
 
 from app.db.decorator import repository
 from app.db.models.client import ClientEntity
+from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase, scopes_contains_conditions
 from app.models.oin import Oin
 
@@ -29,16 +31,21 @@ class ClientRepository(RepositoryBase):
         stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
         return bool(self.db_session.session.execute(stmt).scalar())
 
-    def get_by_credentials(self, organization_id: UUID, oin: Oin, common_name: str) -> ClientEntity | None:
-        stmt = select(ClientEntity).where(
-            and_(
-                ClientEntity.organization_id == organization_id,
-                ClientEntity.oin == oin,
-                ClientEntity.common_name == common_name,
-                ClientEntity.deleted_at.is_(None),
+    def get_by_credentials(self, common_name: str, oin: Oin, register_id: Oin) -> ClientEntity | None:
+        stmt = (
+            select(ClientEntity)
+            .join(OrganizationEntity, ClientEntity.organization_id == OrganizationEntity.id)
+            .where(
+                and_(
+                    ClientEntity.common_name == common_name,
+                    ClientEntity.oin == oin,
+                    OrganizationEntity.register_id == register_id,
+                    OrganizationEntity.deleted_at.is_(None),
+                    ClientEntity.deleted_at.is_(None),
+                )
             )
+            .options(joinedload(ClientEntity.organization))
         )
-
         return self.db_session.session.execute(stmt).scalar_one_or_none()
 
     def get_many(

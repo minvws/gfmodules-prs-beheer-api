@@ -239,7 +239,7 @@ def test_update_one_scope_enforcement(
 
 
 @pytest.mark.parametrize(
-    "common_name, expected",
+    "common_name, expected_scopes",
     [
         ("Scoped Client", "read write"),
         ("Nobody", None),
@@ -249,12 +249,17 @@ def test_resolve_prs(
     client_service: ClientService,
     organization_service: OrganizationService,
     common_name: str,
-    expected: str | None,
+    expected_scopes: str | None,
 ) -> None:
     org = _scoped_org(organization_service, "read write delete")
     _create_client(client_service, org.id, common_name="Scoped Client", scopes="read write")
     resolved = client_service.resolve(oin=Oin(TEST_OIN), common_name=common_name, register_id=org.register_id)
-    assert resolved == expected
+    if expected_scopes is None:
+        assert resolved is None
+    else:
+        assert resolved is not None
+        assert resolved.scopes == expected_scopes
+        assert resolved.organization_name == "Scoped Org"
 
 
 def test_resolve_unknown_register_id_returns_none(
