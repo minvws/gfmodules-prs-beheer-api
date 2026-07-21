@@ -17,16 +17,16 @@ def resolve(
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
     client = service.resolve(
-        oin=data.oin,
-        common_name=data.common_name,
-        register_id=data.org_oin,
+        oin=data.client_organization_id,
+        common_name=data.client_common_name,
+        register_id=data.organization_id,
     )
     if client is None or client.scopes is None:
         logger.warning(
-            "Client not found or has no granted scopes: client_oin=%s common_name=%s org_oin=%s",
-            data.oin,
-            data.common_name,
-            data.org_oin,
+            "Client not found or has no granted scopes: client_oin=%s common_name=%s org_id=%s",
+            data.client_organization_id,
+            data.client_common_name,
+            data.organization_id,
         )
         raise HTTPException(status_code=404, detail="Client not found.")
 
