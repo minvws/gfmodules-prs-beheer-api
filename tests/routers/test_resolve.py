@@ -10,7 +10,11 @@ ORG_OIN = "00000099000000009000"
 
 
 def _body(**overrides: object) -> dict[str, object]:
-    body: dict[str, object] = {"oin": str(VALID_OIN), "common_name": "Client", "org_id": ORG_OIN}
+    body: dict[str, object] = {
+        "client_organization_id": str(VALID_OIN),
+        "client_common_name": "Client",
+        "organization_id": ORG_OIN,
+    }
     body.update(overrides)
     return body
 
@@ -49,10 +53,14 @@ def test_resolve_client_without_scopes_returns_404(api: TestClient, mock_client_
 @pytest.mark.parametrize(
     "body",
     [
-        {"common_name": "C", "org_id": ORG_OIN},  # missing oin
-        {"oin": str(VALID_OIN), "org_id": ORG_OIN},  # missing common_name
-        {"oin": str(VALID_OIN), "common_name": "C"},  # missing org_id
-        {"oin": "invalid-oin", "common_name": "C", "org_id": ORG_OIN},  # malformed oin
+        {"client_common_name": "C", "organization_id": ORG_OIN},  # missing client_organization_id
+        {"client_organization_id": str(VALID_OIN), "organization_id": ORG_OIN},  # missing client_common_name
+        {"client_organization_id": str(VALID_OIN), "client_common_name": "C"},  # missing organization_id
+        {
+            "client_organization_id": "invalid-oin",
+            "client_common_name": "C",
+            "organization_id": ORG_OIN,
+        },  # malformed client_organization_id
     ],
 )
 def test_resolve_invalid_body_returns_422(

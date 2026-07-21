@@ -39,9 +39,9 @@ class Client(Base, ClientCreate):
 
 
 class ClientResolveRequest(BaseModel):
-    oin: Oin = Field(..., description=OIN_DESCRIPTION)
-    common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
-    org_id: Oin = Field(..., description=ORG_OIN_DESCRIPTION)
+    client_organization_id: Oin = Field(..., description=OIN_DESCRIPTION)
+    client_common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
+    organization_id: Oin = Field(..., description=ORG_OIN_DESCRIPTION)
 
 
 class ClientResolveResponse(BaseModel):

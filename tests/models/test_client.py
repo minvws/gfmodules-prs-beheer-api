@@ -71,17 +71,17 @@ def test_query_params_all_optional_and_track_supplied_only() -> None:
 
 def test_resolve_request_should_succeed() -> None:
     model = ClientResolveRequest(
-        oin=TEST_OIN,
-        common_name="Test Client",
-        org_id=Oin("00000099000000001000"),
+        client_organization_id=TEST_OIN,
+        client_common_name="Test Client",
+        organization_id=Oin("00000099000000001000"),
     )
-    assert model.oin == TEST_OIN
-    assert model.org_id == Oin("00000099000000001000")
+    assert model.client_organization_id == TEST_OIN
+    assert model.organization_id == Oin("00000099000000001000")
 
 
 def test_resolve_request_missing_org_id_should_raise() -> None:
     with pytest.raises(ValidationError):
         ClientResolveRequest(  # type: ignore[call-arg]
-            oin=TEST_OIN,
-            common_name="Test Client",
+            client_organization_id=TEST_OIN,
+            client_common_name="Test Client",
         )
