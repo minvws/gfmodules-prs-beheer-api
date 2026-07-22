@@ -11,7 +11,14 @@ SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
 
 
 class Scopes(BaseModel):
+    """The scopes field as stored. Deliberately unvalidated so that responses can always be
+    rendered, even for records holding a scope the configured allow-list no longer contains."""
+
     scopes: str | None = Field(default=None, description=SCOPES_DESCRIPTION)
+
+
+class ValidatedScopes(Scopes):
+    """The scopes field as accepted on request bodies: restricted to the configured allow-list."""
 
     @field_validator("scopes", mode="before")
     @classmethod
@@ -23,14 +30,18 @@ class Scopes(BaseModel):
         return value
 
 
-class OrganizationCreate(Scopes):
+class OrganizationFields(Scopes):
     model_config = ConfigDict(from_attributes=True)
 
     register_id: Oin = Field(..., description=REGISTER_ID_DESCRIPTION)
     name: str = Field(..., description=NAME_DESCRIPTION)
 
 
-class OrganizationUpdate(Scopes):
+class OrganizationCreate(ValidatedScopes, OrganizationFields):
+    pass
+
+
+class OrganizationUpdate(ValidatedScopes):
     name: str | None = Field(default=None, description=NAME_DESCRIPTION)
 
 
@@ -41,5 +52,5 @@ class OrganizationQueryParams(BaseModel):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Organization(Base, OrganizationCreate):
+class Organization(Base, OrganizationFields):
     pass

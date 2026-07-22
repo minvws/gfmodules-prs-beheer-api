@@ -72,3 +72,18 @@ def test_response_model_from_entity_with_none_scopes() -> None:
 
     model = Organization.model_validate(_Entity())
     assert model.scopes is None
+
+
+def test_response_model_allows_scopes_no_longer_configured() -> None:
+    """Narrowing the configured allow-list must not make existing records unreadable."""
+
+    class _Entity:
+        id = uuid4()
+        register_id = TEST_REGISTER_ID
+        name = TEST_ORG_NAME
+        scopes = "admin"
+        created_at = now.now()
+        deleted_at = None
+
+    model = Organization.model_validate(_Entity())
+    assert model.scopes == "admin"
