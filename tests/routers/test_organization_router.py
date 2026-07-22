@@ -79,6 +79,19 @@ def test_get_by_id_returns_200(api: TestClient, mock_organization_service: Magic
     mock_organization_service.get_one.assert_called_once_with(entity.id)
 
 
+def test_get_by_id_returns_200_for_scopes_no_longer_configured(
+    api: TestClient, mock_organization_service: MagicMock
+) -> None:
+    """Narrowing the configured allow-list must not make existing organizations unreadable."""
+    entity = make_organization_entity(scopes="admin")
+    mock_organization_service.get_one.return_value = entity
+
+    response = api.get(f"/organizations/{entity.id}")
+
+    assert response.status_code == 200
+    assert response.json()["scopes"] == "admin"
+
+
 def test_get_by_id_not_found_returns_404(api: TestClient, mock_organization_service: MagicMock) -> None:
     mock_organization_service.get_one.return_value = None
     response = api.get(f"/organizations/{ORG_ID}")
