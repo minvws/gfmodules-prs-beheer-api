@@ -33,7 +33,7 @@ class ClientEntity(CommonColumns):
     oin: Mapped[Oin] = mapped_column("oin", OinType)
     common_name: Mapped[str] = mapped_column("common_name", String)
 
-    organization: Mapped["OrganizationEntity"] = relationship(back_populates="clients", lazy="raise")
+    organization: Mapped[OrganizationEntity] = relationship(back_populates="clients", lazy="raise")
 
     @property
     def organization_name(self) -> str:

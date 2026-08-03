@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, update
@@ -19,9 +19,9 @@ class ClientRepository(RepositoryBase):
             self.db_session.add(data)
             self.db_session.commit()
             return data
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             self.db_session.rollback()
-            raise e
+            raise
 
     def get_one(self, organization_id: UUID, id: UUID) -> ClientEntity | None:
         stmt = select(ClientEntity).where(self._and_clause(organization_id, id))
@@ -69,7 +69,8 @@ class ClientRepository(RepositoryBase):
 
     def update(self, organization_id: UUID, id: UUID, **kwargs: object) -> ClientEntity | None:
         try:
-            target = {k: kwargs[k] for k in ClientEntity.__table__.columns.keys() if k in kwargs}
+            valid_columns = set(ClientEntity.__table__.columns.keys())
+            target = {key: kwargs[key] for key in kwargs if key in valid_columns}
             if not target:
                 return None
             stmt = (
@@ -78,9 +79,9 @@ class ClientRepository(RepositoryBase):
             result = self.db_session.session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
             return result
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             self.db_session.rollback()
-            raise e
+            raise
 
     def _and_clause(self, organization_id: UUID, id: UUID) -> ColumnElement[bool]:
         return and_(

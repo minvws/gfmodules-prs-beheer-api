@@ -1,4 +1,5 @@
 import logging
+from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
@@ -56,7 +57,7 @@ def ok_or_error(value: bool) -> str:
     },
     tags=["Health"],
 )
-def health(db: Database = Depends(get_database)) -> JSONResponse:
+def health(db: Annotated[Database, Depends(get_database)]) -> JSONResponse:
     logger.info("Checking database health")
 
     components = {

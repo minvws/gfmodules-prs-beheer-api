@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -120,7 +120,7 @@ def test_get_many_excludes_deleted(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        client_repository.update(client_entity.organization_id, client_entity.id, deleted_at=datetime.now())
+        client_repository.update(client_entity.organization_id, client_entity.id, deleted_at=datetime.now(timezone.utc))
         assert client_repository.get_many(organization_id=client_entity.organization_id) == []
 
 
@@ -130,7 +130,7 @@ def test_get_many_include_deleted_returns_deleted(
 ) -> None:
     with client_repository.db_session:
         client_repository.add_one(client_entity)
-        client_repository.update(client_entity.organization_id, client_entity.id, deleted_at=datetime.now())
+        client_repository.update(client_entity.organization_id, client_entity.id, deleted_at=datetime.now(timezone.utc))
         results = client_repository.get_many(organization_id=client_entity.organization_id, include_deleted=True)
         assert len(results) == 1
         assert results[0].id == client_entity.id

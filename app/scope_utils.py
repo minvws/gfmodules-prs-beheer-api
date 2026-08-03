@@ -5,7 +5,7 @@ def parse(value: str | None) -> set[str]:
     if not value:
         return set()
     split = value.split()
-    return set(split.strip() for split in split)
+    return {split.strip() for split in split}
 
 
 def is_subset(child: str | None, parent: str | None) -> bool:

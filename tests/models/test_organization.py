@@ -1,5 +1,7 @@
+from collections.abc import Generator
 from datetime import datetime as now
-from typing import Any, Generator
+from datetime import timezone
+from typing import Any
 from uuid import uuid4
 
 import inject
@@ -67,7 +69,7 @@ def test_response_model_from_entity_with_none_scopes() -> None:
         register_id = TEST_REGISTER_ID
         name = TEST_ORG_NAME
         scopes = None
-        created_at = now.now()
+        created_at = now.now(timezone.utc)
         deleted_at = None
 
     model = Organization.model_validate(_Entity())
@@ -82,7 +84,7 @@ def test_response_model_allows_scopes_no_longer_configured() -> None:
         register_id = TEST_REGISTER_ID
         name = TEST_ORG_NAME
         scopes = "admin"
-        created_at = now.now()
+        created_at = now.now(timezone.utc)
         deleted_at = None
 
     model = Organization.model_validate(_Entity())

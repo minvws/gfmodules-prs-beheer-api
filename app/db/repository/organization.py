@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select, update
@@ -18,9 +18,9 @@ class OrganizationRepository(RepositoryBase):
             self.db_session.add(data)
             self.db_session.commit()
             return data
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             self.db_session.rollback()
-            raise e
+            raise
 
     def get_one(self, id: UUID) -> OrganizationEntity | None:
         stmt = select(OrganizationEntity).where(self._and_clause(id))
@@ -67,16 +67,17 @@ class OrganizationRepository(RepositoryBase):
 
     def update(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:
         try:
-            target = {k: kwargs[k] for k in OrganizationEntity.__table__.columns.keys() if k in kwargs}
+            valid_columns = set(OrganizationEntity.__table__.columns.keys())
+            target = {key: kwargs[key] for key in kwargs if key in valid_columns}
             if not target:
                 return None
             stmt = update(OrganizationEntity).where(self._and_clause(id)).values(target).returning(OrganizationEntity)
             result = self.db_session.session.execute(stmt).scalar_one_or_none()
             self.db_session.commit()
             return result
-        except SQLAlchemyError as e:
+        except SQLAlchemyError:
             self.db_session.rollback()
-            raise e
+            raise
 
     def _and_clause(self, id: UUID) -> ColumnElement[bool]:
         return and_(
