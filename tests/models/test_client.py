@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -28,7 +28,7 @@ def test_response_model_from_entity() -> None:
         oin = TEST_OIN
         common_name = "Test Client"
         scopes = None
-        created_at = datetime.now()
+        created_at = datetime.now(timezone.utc)
         deleted_at = None
 
     model = Client.model_validate(_Entity())

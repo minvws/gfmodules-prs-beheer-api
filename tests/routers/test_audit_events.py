@@ -1,7 +1,8 @@
 """Asserts each management operation emits the correct PRS-OB audit event (issue 1040)."""
 
 import logging
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 from unittest.mock import MagicMock
 
 import inject

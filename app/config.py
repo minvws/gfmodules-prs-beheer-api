@@ -29,9 +29,9 @@ class ConfigApp(BaseModel):
     @field_validator("scopes", mode="before")
     def validate_scopes(cls, value: str) -> set[str]:
         if not isinstance(value, str):
-            raise ValueError("Scopes must be a string")
+            raise TypeError("Scopes must be a string")
         split = value.split()
-        return set(split.strip() for split in split)
+        return {split.strip() for split in split}
 
 
 class ConfigLogging(BaseModel):
@@ -119,7 +119,6 @@ def set_config(config: Config) -> None:
 
 def get_config(path: str | None = None) -> Config:
     global _CONFIG
-    global _PATH
 
     if _CONFIG is not None:
         return _CONFIG
@@ -144,6 +143,6 @@ def get_config(path: str | None = None) -> Config:
         _CONFIG = Config.model_validate(ini_data)
     except ValidationError as e:
         logger.error(f"Configuration validation error: {e}")
-        raise e
+        raise
 
     return _CONFIG

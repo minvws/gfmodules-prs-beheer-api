@@ -1,6 +1,5 @@
 import logging
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone
 from uuid import UUID
 
 from app.db.db import Database
@@ -51,7 +50,7 @@ class ClientService:
         common_name: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,
-    ) -> List[ClientEntity]:
+    ) -> list[ClientEntity]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
             return list(
@@ -94,7 +93,7 @@ class ClientService:
                     id,
                 )
                 return None
-            return repo.update(organization_id, id, deleted_at=datetime.now())
+            return repo.update(organization_id, id, deleted_at=datetime.now(timezone.utc))
 
     def resolve(
         self,

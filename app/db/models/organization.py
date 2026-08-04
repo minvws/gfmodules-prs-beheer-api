@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -28,6 +28,6 @@ class OrganizationEntity(CommonColumns):
     register_id: Mapped[Oin] = mapped_column("register_id", OinType)
     name: Mapped[str] = mapped_column("name", String)
 
-    clients: Mapped[List["ClientEntity"]] = relationship(
+    clients: Mapped[list[ClientEntity]] = relationship(
         back_populates="organization", cascade="all, delete-orphan", lazy="raise"
     )

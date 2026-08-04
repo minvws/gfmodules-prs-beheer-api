@@ -1,6 +1,5 @@
 import logging
-from datetime import datetime
-from typing import List
+from datetime import datetime, timezone
 from uuid import UUID
 
 from app import scope_utils
@@ -44,7 +43,7 @@ class OrganizationService:
         name: str | None = None,
         scopes: str | None = None,
         include_deleted: bool = False,
-    ) -> List[OrganizationEntity]:
+    ) -> list[OrganizationEntity]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
             return list(
@@ -88,7 +87,7 @@ class OrganizationService:
             if any(client.deleted_at is None for client in organization.clients):
                 logger.warning("Cannot delete organization with active clients organization_id=%s", id)
                 raise OrganizationHasClientsError()
-            return repo.update(id, deleted_at=datetime.now())
+            return repo.update(id, deleted_at=datetime.now(timezone.utc))
 
     def assert_scopes_granted(self, organization_id: UUID, requested: str | None) -> None:
         organization = self.get_one(organization_id)

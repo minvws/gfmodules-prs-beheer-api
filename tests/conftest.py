@@ -1,5 +1,6 @@
-from datetime import datetime
-from typing import Any, Generator
+from collections.abc import Generator
+from datetime import datetime, timezone
+from typing import Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -28,7 +29,7 @@ TEST_REGISTER_ID = Oin("00000099000000009000")
 TEST_ORG_NAME = "Test Organization"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
-FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0)
+FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 
 @pytest.fixture()
