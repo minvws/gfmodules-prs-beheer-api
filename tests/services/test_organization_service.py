@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
@@ -212,6 +213,28 @@ def test_update_one_scope_removal_allowed_when_client_no_longer_uses_it(
     result = organization_service.update_one(created.id, scopes="foo bar")
     assert result is not None
     assert result.scopes == "foo bar"
+
+
+def test_update_one_can_change_register_id(
+    organization_service: OrganizationService,
+) -> None:
+    created = organization_service.create_one(
+        register_id=TEST_REGISTER_ID,
+        name=TEST_ORG_NAME,
+    )
+    result = organization_service.update_one(created.id, register_id=SECOND_ORG_REG_ID)
+    assert result is not None
+    assert result.register_id == SECOND_ORG_REG_ID
+
+
+def test_update_one_register_id_conflict_raises_integrity_error(
+    organization_service: OrganizationService,
+) -> None:
+    first = organization_service.create_one(register_id=TEST_REGISTER_ID, name="First Org")
+    second = organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
+
+    with pytest.raises(IntegrityError):
+        organization_service.update_one(first.id, register_id=second.register_id)
 
 
 def test_update_one_scope_removal_ignores_deleted_clients(

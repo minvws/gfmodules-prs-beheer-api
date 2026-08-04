@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.exc import IntegrityError, InvalidRequestError
 
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
@@ -79,6 +79,18 @@ def test_update_ignores_invalid_fields(
         organization_repository.add_one(organization_entity)
         result = organization_repository.update(id=organization_entity.id, non_existing_field="value")
         assert result is None
+
+
+def test_update_raises_integrity_error_on_duplicate_register_id(
+    organization_repository: OrganizationRepository,
+    organization_entity: OrganizationEntity,
+) -> None:
+    other = OrganizationEntity(register_id=Oin("00000099000000008000"), name="Another Organization")
+    with organization_repository.db_session:
+        organization_repository.add_one(organization_entity)
+        organization_repository.add_one(other)
+        with pytest.raises(IntegrityError):
+            organization_repository.update(id=organization_entity.id, register_id=other.register_id)
 
 
 def test_update_not_found(organization_repository: OrganizationRepository) -> None:

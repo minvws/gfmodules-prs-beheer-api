@@ -41,8 +41,8 @@ class OrganizationCreate(ValidatedScopes, OrganizationFields):
     pass
 
 
-class OrganizationUpdate(ValidatedScopes):
-    name: str | None = Field(default=None, description=NAME_DESCRIPTION)
+class OrganizationUpdate(ValidatedScopes, OrganizationFields):
+    pass
 
 
 class OrganizationQueryParams(BaseModel):

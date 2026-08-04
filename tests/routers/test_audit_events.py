@@ -71,26 +71,35 @@ def test_organization_delete_logs_260401(
 def test_organization_scopes_update_logs_260404(
     api: TestClient, mock_organization_service: MagicMock, caplog: pytest.LogCaptureFixture
 ) -> None:
-    entity = make_organization_entity(register_id=VALID_OIN, scopes="read")
-    mock_organization_service.update_one.return_value = entity
+    current_entity = make_organization_entity(register_id=VALID_OIN, scopes="read")
+    updated_entity = make_organization_entity(register_id=VALID_OIN, scopes="write")
+    mock_organization_service.get_one.return_value = current_entity
+    mock_organization_service.update_one.return_value = updated_entity
 
     with caplog.at_level(logging.DEBUG):
-        response = api.put(f"/organizations/{entity.id}", json={"scopes": "read"})
+        response = api.put(
+            f"/organizations/{current_entity.id}",
+            json={"register_id": str(current_entity.register_id), "name": "Renamed", "scopes": "write"},
+        )
 
     assert response.status_code == 200
     record = _record(caplog, Log.SCOPES_CHANGED.event_id)
     assert record.organisatie_oin == str(VALID_OIN)  # type: ignore[attr-defined]
-    assert record.changed_scopes == "read"  # type: ignore[attr-defined]
+    assert record.changed_scopes == "write"  # type: ignore[attr-defined]
 
 
 def test_organization_name_update_does_not_log_260404(
     api: TestClient, mock_organization_service: MagicMock, caplog: pytest.LogCaptureFixture
 ) -> None:
-    entity = make_organization_entity(register_id=VALID_OIN)
+    entity = make_organization_entity(register_id=VALID_OIN, scopes="read")
+    mock_organization_service.get_one.return_value = entity
     mock_organization_service.update_one.return_value = entity
 
     with caplog.at_level(logging.DEBUG):
-        response = api.put(f"/organizations/{entity.id}", json={"name": "Renamed"})
+        response = api.put(
+            f"/organizations/{entity.id}",
+            json={"register_id": str(entity.register_id), "name": "Renamed", "scopes": "read"},
+        )
 
     assert response.status_code == 200
     _no_record(caplog, Log.SCOPES_CHANGED.event_id)

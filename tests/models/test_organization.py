@@ -8,6 +8,7 @@ import inject
 import pytest
 from pydantic import ValidationError
 
+from app.models.oin import Oin
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
 
@@ -47,20 +48,40 @@ def test_create_missing_name_should_raise() -> None:
 
 
 def test_update_should_succeed() -> None:
-    model = OrganizationUpdate(name="New Name")
+    model = OrganizationUpdate(register_id=TEST_REGISTER_ID, name="New Name", scopes="read")
     assert model.name == "New Name"
+    assert model.scopes == "read"
+
+
+def test_update_allows_register_id() -> None:
+    new_register_id = Oin("00000099000000008000")
+    model = OrganizationUpdate(register_id=new_register_id, name="New Name", scopes="write")
+    assert model.register_id == new_register_id
+    assert model.name == "New Name"
+
+
+def test_update_missing_name_is_422() -> None:
+    with pytest.raises(ValidationError):
+        OrganizationUpdate(register_id=TEST_REGISTER_ID)  # type: ignore[call-arg]
+
+
+def test_update_missing_register_id_is_422() -> None:
+    with pytest.raises(ValidationError):
+        OrganizationUpdate(name="New Name")  # type: ignore[call-arg]
+
+
+def test_update_without_scopes_defaults_to_none() -> None:
+    model = OrganizationUpdate(register_id=TEST_REGISTER_ID, name="New Name")
     assert model.scopes is None
 
 
-def test_update_is_partial_all_fields_optional() -> None:
-    model = OrganizationUpdate()
-    assert model.name is None
-    assert model.scopes is None
-
-
-def test_update_only_tracks_supplied_fields() -> None:
-    model = OrganizationUpdate(scopes="read")
-    assert model.model_dump(exclude_unset=True) == {"scopes": "read"}
+def test_update_requires_all_fields() -> None:
+    model = OrganizationUpdate(register_id=TEST_REGISTER_ID, name="New Name", scopes="read")
+    assert model.model_dump(exclude_unset=True) == {
+        "register_id": TEST_REGISTER_ID,
+        "name": "New Name",
+        "scopes": "read",
+    }
 
 
 def test_response_model_from_entity_with_none_scopes() -> None:

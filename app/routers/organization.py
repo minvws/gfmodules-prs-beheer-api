@@ -14,6 +14,7 @@ from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
+_register_id_conflict_message = "There is an active organization with the same register_id."
 
 
 @router.post("", response_model=Organization, response_model_exclude_none=True, status_code=201)
@@ -26,7 +27,7 @@ def register(
         result = service.create_one(**data.model_dump())
     except IntegrityError:
         logger.warning("Organization create conflict for register_id=%s", data.register_id)
-        raise HTTPException(status_code=409, detail="An organization with this ID is already registered.")
+        raise HTTPException(status_code=409, detail=_register_id_conflict_message)
     Log.event(
         logger,
         Log.ORGANIZATION_REGISTERED,
@@ -70,17 +71,24 @@ def update(
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    fields = body.model_dump(exclude_unset=True)
+    current = service.get_one(id)
+    if current is None:
+        logger.debug("Organization not found for update id=%s", id)
+        raise HTTPException(status_code=404)
+
+    fields = body.model_dump()
     logger.debug("Updating organization id=%s fields=%s", id, list(fields.keys()))
     try:
         result = service.update_one(id, **fields)
     except ScopesInUseError as error:
         logger.warning("Organization update rejected id=%s: %s", id, error)
         raise HTTPException(status_code=409, detail=str(error))
+    except IntegrityError:
+        logger.warning("Organization update conflict id=%s", id)
+        raise HTTPException(status_code=409, detail=_register_id_conflict_message)
     if result is None:
-        logger.debug("Organization not found for update id=%s", id)
         raise HTTPException(status_code=404)
-    if "scopes" in fields:
+    if fields["scopes"] != current.scopes:
         Log.event(
             logger,
             Log.SCOPES_CHANGED,

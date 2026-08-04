@@ -43,6 +43,7 @@ def test_register_conflict_returns_409(api: TestClient, mock_organization_servic
     mock_organization_service.create_one.side_effect = IntegrityError("stmt", {}, Exception("duplicate"))
     response = api.post("/organizations", json={"register_id": str(VALID_OIN), "name": "Org"})
     assert response.status_code == 409
+    assert "There is an active organization with the same register_id." in response.text
 
 
 @pytest.mark.parametrize(
@@ -149,27 +150,36 @@ def test_get_many_invalid_include_deleted_returns_422(api: TestClient, value: st
 def test_update_returns_200(api: TestClient, mock_organization_service: MagicMock) -> None:
     entity = make_organization_entity(name="New Name")
     mock_organization_service.update_one.return_value = entity
-    response = api.put(f"/organizations/{entity.id}", json={"name": "New Name"})
+    response = api.put(
+        f"/organizations/{entity.id}",
+        json={"register_id": str(VALID_OIN), "name": "New Name", "scopes": "read"},
+    )
     assert response.status_code == 200
     assert response.json()["name"] == "New Name"
 
 
 def test_update_not_found_returns_404(api: TestClient, mock_organization_service: MagicMock) -> None:
-    mock_organization_service.update_one.return_value = None
-    response = api.put(f"/organizations/{ORG_ID}", json={"name": "X"})
+    mock_organization_service.get_one.return_value = None
+    response = api.put(f"/organizations/{ORG_ID}", json={"register_id": str(VALID_OIN), "name": "X", "scopes": "read"})
     assert response.status_code == 404
+    mock_organization_service.update_one.assert_not_called()
 
 
 @pytest.mark.parametrize(
     "body, expected_kwargs",
     [
-        ({"name": "N"}, {"name": "N"}),
-        ({"scopes": "read"}, {"scopes": "read"}),
-        ({"name": "N", "scopes": "read"}, {"name": "N", "scopes": "read"}),
-        ({}, {}),  # nothing supplied -> nothing forwarded
+        (
+            {"register_id": str(VALID_OIN), "name": "N", "scopes": "read"},
+            {"register_id": VALID_OIN, "name": "N", "scopes": "read"},
+        ),
+        (
+            {"register_id": str(VALID_OIN), "name": "N", "scopes": "read write"},
+            {"register_id": VALID_OIN, "name": "N", "scopes": "read write"},
+        ),
+        ({"register_id": str(VALID_OIN), "name": "N"}, {"register_id": VALID_OIN, "name": "N", "scopes": None}),
     ],
 )
-def test_update_forwards_only_supplied_fields(
+def test_update_forwards_all_supplied_fields(
     api: TestClient, mock_organization_service: MagicMock, body: dict[str, object], expected_kwargs: dict[str, object]
 ) -> None:
     mock_organization_service.update_one.return_value = make_organization_entity()
@@ -179,14 +189,44 @@ def test_update_forwards_only_supplied_fields(
 
 def test_update_scopes_in_use_returns_409(api: TestClient, mock_organization_service: MagicMock) -> None:
     mock_organization_service.update_one.side_effect = ScopesInUseError({"read"})
-    response = api.put(f"/organizations/{ORG_ID}", json={"scopes": "write"})
+    response = api.put(f"/organizations/{ORG_ID}", json={"register_id": str(VALID_OIN), "name": "X", "scopes": "write"})
     assert response.status_code == 409
     assert "Scopes still in use by one or more clients: read" in response.text
 
 
+def test_update_register_id_conflict_returns_409(api: TestClient, mock_organization_service: MagicMock) -> None:
+    mock_organization_service.update_one.side_effect = IntegrityError("stmt", {}, Exception("duplicate"))
+    response = api.put(f"/organizations/{ORG_ID}", json={"register_id": str(VALID_OIN), "name": "X", "scopes": "read"})
+    assert response.status_code == 409
+    assert "There is an active organization with the same register_id." in response.text
+
+
 def test_update_invalid_uuid_returns_422(api: TestClient) -> None:
-    response = api.put("/organizations/not-a-uuid", json={"name": "X"})
+    response = api.put("/organizations/not-a-uuid", json={"register_id": str(VALID_OIN), "name": "X", "scopes": "read"})
     assert response.status_code == 422
+
+
+def test_update_without_register_id_returns_422(api: TestClient) -> None:
+    response = api.put(f"/organizations/{ORG_ID}", json={"name": "X", "scopes": "read"})
+    assert response.status_code == 422
+
+
+def test_update_without_name_returns_422(api: TestClient) -> None:
+    response = api.put(f"/organizations/{ORG_ID}", json={"register_id": str(VALID_OIN), "scopes": "read"})
+    assert response.status_code == 422
+
+
+def test_update_without_scopes_defaults_to_none(api: TestClient, mock_organization_service: MagicMock) -> None:
+    entity = make_organization_entity(name="X")
+    mock_organization_service.update_one.return_value = entity
+    response = api.put(f"/organizations/{ORG_ID}", json={"register_id": str(VALID_OIN), "name": "X"})
+    assert response.status_code == 200
+    mock_organization_service.update_one.assert_called_once_with(
+        UUID(ORG_ID),
+        register_id=VALID_OIN,
+        name="X",
+        scopes=None,
+    )
 
 
 def test_delete_returns_204(api: TestClient, mock_organization_service: MagicMock) -> None:
