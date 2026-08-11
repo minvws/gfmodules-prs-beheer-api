@@ -20,6 +20,16 @@ class LogEvent:
     fields: Mapping[LoggingStreams, tuple[str, ...]] = field(default_factory=dict)
 
 
+ACCESS_EVENT_ID = {
+    ("POST", "/organizations"): "260700",
+    ("PUT", "/organizations/{id}"): "260701",
+    ("DELETE", "/organizations/{id}"): "260702",
+    ("POST", "/organizations/{organization_id}/clients"): "260703",
+    ("PUT", "/organizations/{organization_id}/clients/{id}"): "260704",
+    ("DELETE", "/organizations/{organization_id}/clients/{id}"): "260705",
+}
+
+
 class Log:
     # Onboarding en Beheer (PRS-OB) audit events for the beheer API.
     # See https://github.com/minvws/gfmodules-coordination-private/issues/1040
@@ -81,6 +91,12 @@ class Log:
             _SIEM: ("error_reason",),
         },
     )
+    ACCESS_REQUEST = LogEvent(  # NVI-AUTH-101
+        "260450",
+        logging.INFO,
+        (_APP,),
+        {_APP: ("endpoint", "method", "gf-act-cn")},
+    )
 
     @staticmethod
     def event(
@@ -88,11 +104,12 @@ class Log:
         event: LogEvent,
         message: str,
         *,
+        event_id: str | None = None,
         exc_info: Any = None,
         **fields: Any,
     ) -> None:
         extra: dict[str, Any] = {
-            "event_id": event.event_id,
+            "event_id": event_id if event_id else event.event_id,
             "stream": list(event.streams),
         }
         if event.fields:
