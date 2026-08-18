@@ -33,11 +33,11 @@ class OrganizationEntity(AdminBase):
     clients: Mapped[list[ClientEntity]] = relationship("ClientEntity")
 
     receive_personal_id_types: Mapped[list[OrganizationReceivePersonalIdTypeEntity]] = relationship(
-        "OrganizationReceivePersonalIdTypeEntity", cascade="delete-orphan"
+        "OrganizationReceivePersonalIdTypeEntity", cascade="all, delete-orphan"
     )
 
     request_personal_id_types: Mapped[list[OrganizationRequestPersonalIdTypeEntity]] = relationship(
-        "OrganizationRequestPersonalIdTypeEntity", cascade="delete-orphan"
+        "OrganizationRequestPersonalIdTypeEntity", cascade="all, delete-orphan"
     )
 
     created_at: Mapped[datetime] = mapped_column(
