@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 from sqlalchemy import UUID, DateTime, Enum, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.models.base import AdminBase, PersonalIdType
+from app.db.models.base import AdminBase
+from app.enums.personal_id_type import PersonalIdType
 
 
 class OrganizationRequestPersonalIdTypeEntity(AdminBase):
