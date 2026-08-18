@@ -31,7 +31,8 @@ class ClientEntity(Base):
     # need to support additional external_id types.
     external_id: Mapped[Oin] = mapped_column(OinType())
 
-    organization_id: Mapped[uuid.UUID] = mapped_column(UUID)
+    # TODO GB: What use in linking the organization
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
 
     common_name: Mapped[str] = mapped_column(String)
 

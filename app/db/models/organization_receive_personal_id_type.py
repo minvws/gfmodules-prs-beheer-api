@@ -5,10 +5,10 @@ from datetime import timezone, datetime
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Index, String, text, DateTime, UUID, ForeignKey
+from sqlalchemy import Index, String, text, DateTime, UUID, ForeignKey, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.models.base import Base
+from app.db.models.base import Base, PersonalIdType
 from app.db.types.oin_type import OinType
 from app.models.oin import Oin
 
@@ -27,7 +27,7 @@ class OrganizationReceivePersonalIdTypeEntity(Base):
         default=uuid.uuid4,
     )
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
-    personal_id_type: Mapped[str] = mapped_column(String)
+    personal_id_type: Mapped[PersonalIdType] = mapped_column(Enum(PersonalIdType))
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

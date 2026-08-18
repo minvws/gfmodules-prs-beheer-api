@@ -1,3 +1,4 @@
+from app.db.models.base import PersonalIdType
 from datetime import datetime
 from uuid import UUID
 
@@ -25,7 +26,7 @@ class ClientFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     external_id: Oin = Field(description=EXTERNAL_ID_DESCRIPTION)
     common_name: str = Field(description="The common_name or SAN on which the client is authorized")
-    request_personal_id_types: list[str] = Field(example=["oprf"])
+    request_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
 
 
 class ClientCreate(BaseModel):
@@ -33,7 +34,7 @@ class ClientCreate(BaseModel):
 
     external_id: Oin = Field(..., description=EXTERNAL_ID_DESCRIPTION)
     common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
-    request_personal_id_types: list[str] = Field(example=["oprf"])
+    request_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
 
 
 class ClientUpdate(ClientFields):

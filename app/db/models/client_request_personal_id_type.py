@@ -15,6 +15,7 @@ from app.models.oin import Oin
 if TYPE_CHECKING:
     from app.db.models.client import ClientEntity
     from app.db.models.organization import OrganizationEntity
+    from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
 
 
 class ClientRequestPersonalIdTypeEntity(Base):
@@ -31,7 +32,7 @@ class ClientRequestPersonalIdTypeEntity(Base):
     organization_request_personal_id_type_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("admin.organization_request_personal_id_types.id")
     )
-    organization_request_personal_id_type: Mapped[OrganizationRequestPersonalIdTypeEntity] = relationship()
+    organization_request_personal_id_type: Mapped["OrganizationRequestPersonalIdTypeEntity"] = relationship()
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

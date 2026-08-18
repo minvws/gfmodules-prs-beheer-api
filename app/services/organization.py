@@ -1,9 +1,10 @@
+from sqlalchemy.exc import IntegrityError
 from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
 from app.db.models.organization_receive_personal_id_type import OrganizationReceivePersonalIdTypeEntity
 from sqlalchemy import ForeignKey
 from typing import List
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.db.models.base import Base
+from app.db.models.base import Base, PersonalIdType
 from app.models.organization import OrganizationCreate, Organization, OrganizationUpdate
 from fastapi import HTTPException
 import logging
@@ -129,6 +130,9 @@ class OrganizationService:
             if not entity:
                 logger.debug("Organization not found for update id=%s", id)
                 raise HTTPException(status_code=404)
+            if [client for client in entity.clients if client.deleted_at is None]:
+                logger.debug("Organization still has active clients")
+                raise HTTPException(status_code=403, detail="Organization still has active clients")
             entity.updated_at = entity.deleted_at = datetime.now(tz=timezone.utc)
             ret_value = Organization(**entity.to_dict())
             session.commit()
