@@ -1,40 +1,27 @@
-from collections.abc import Generator
-from datetime import datetime as now
-from datetime import timezone
-from typing import Any
+from datetime import datetime, timezone
 from uuid import uuid4
 
-import inject
 import pytest
 from pydantic import ValidationError
 
-from app.models.oin import Oin
+from app.db.models.organization import OrganizationEntity
+from app.db.models.personal_id_type import PersonalIdTypeEntity
+from app.enums.personal_id_type import PersonalIdType
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
-from tests.conftest import TEST_ORG_NAME, TEST_REGISTER_ID
-
-
-@pytest.fixture(autouse=True)
-def configure_allowed_scopes() -> Generator[Any, Any, Any]:
-    inject.clear_and_configure(lambda binder: binder.bind("allowed_scopes", {"read", "write"}))
-    yield
-    inject.clear()
+from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME
 
 
 def test_create_should_succeed() -> None:
-    model = OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
-    assert model.register_id == TEST_REGISTER_ID
+    model = OrganizationCreate(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        receive_personal_id_types=[PersonalIdType.OPRF],
+        request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+    )
+    assert model.external_id == TEST_EXTERNAL_ID
     assert model.name == TEST_ORG_NAME
-    assert model.scopes is None
-
-
-def test_create_with_scopes_should_succeed() -> None:
-    model = OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="read write")
-    assert model.scopes == "read write"
-
-
-def test_create_with_disallowed_scopes_should_raise() -> None:
-    with pytest.raises(ValidationError):
-        OrganizationCreate(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="admin")
+    assert model.receive_personal_id_types == [PersonalIdType.OPRF]
+    assert model.request_personal_id_types == [PersonalIdType.REVERSIBLE_PSEUDONYM]
 
 
 def test_create_missing_register_id_should_raise() -> None:
@@ -44,69 +31,84 @@ def test_create_missing_register_id_should_raise() -> None:
 
 def test_create_missing_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        OrganizationCreate(register_id=TEST_REGISTER_ID)  # type: ignore[call-arg]
+        OrganizationCreate(external_id=TEST_EXTERNAL_ID)  # type: ignore[call-arg]
 
 
 def test_update_should_succeed() -> None:
-    model = OrganizationUpdate(register_id=TEST_REGISTER_ID, name="New Name", scopes="read")
+    model = OrganizationUpdate(
+        external_id=TEST_EXTERNAL_ID,
+        name="New Name",
+        receive_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+        request_personal_id_types=[PersonalIdType.OPRF],
+        deleted=False,
+    )
     assert model.name == "New Name"
-    assert model.scopes == "read"
+    assert model.external_id == TEST_EXTERNAL_ID
+    assert model.receive_personal_id_types == [PersonalIdType.REVERSIBLE_PSEUDONYM]
+    assert model.request_personal_id_types == [PersonalIdType.OPRF]
+    assert model.deleted == False
 
 
-def test_update_allows_register_id() -> None:
-    new_register_id = Oin("00000099000000008000")
-    model = OrganizationUpdate(register_id=new_register_id, name="New Name", scopes="write")
-    assert model.register_id == new_register_id
-    assert model.name == "New Name"
-
-
-def test_update_missing_name_is_422() -> None:
+def test_update_missing_name_should_raise() -> None:
     with pytest.raises(ValidationError):
-        OrganizationUpdate(register_id=TEST_REGISTER_ID)  # type: ignore[call-arg]
+        OrganizationUpdate(  # type: ignore[call-arg]
+            external_id=TEST_EXTERNAL_ID,
+            receive_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            deleted=False,
+        )
 
 
-def test_update_missing_register_id_is_422() -> None:
+def test_update_missing_register_id_should_raise() -> None:
     with pytest.raises(ValidationError):
-        OrganizationUpdate(name="New Name")  # type: ignore[call-arg]
+        OrganizationUpdate(  # type: ignore[call-arg]
+            name=TEST_ORG_NAME,
+            receive_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            deleted=False,
+        )
 
 
-def test_update_without_scopes_defaults_to_none() -> None:
-    model = OrganizationUpdate(register_id=TEST_REGISTER_ID, name="New Name")
-    assert model.scopes is None
+def test_update_missing_receive_pids_should_raise() -> None:
+    with pytest.raises(ValidationError):
+        OrganizationUpdate(  # type: ignore[call-arg]
+            external_id=TEST_EXTERNAL_ID,
+            name=TEST_ORG_NAME,
+            request_personal_id_types=[PersonalIdType.OPRF],
+            deleted=False,
+        )
 
 
-def test_update_requires_all_fields() -> None:
-    model = OrganizationUpdate(register_id=TEST_REGISTER_ID, name="New Name", scopes="read")
-    assert model.model_dump(exclude_unset=True) == {
-        "register_id": TEST_REGISTER_ID,
-        "name": "New Name",
-        "scopes": "read",
-    }
+def test_update_missing_request_pids_should_raise() -> None:
+    with pytest.raises(ValidationError):
+        OrganizationUpdate(  # type: ignore[call-arg]
+            external_id=TEST_EXTERNAL_ID,
+            name=TEST_ORG_NAME,
+            receive_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+            deleted=False,
+        )
 
 
-def test_response_model_from_entity_with_none_scopes() -> None:
-    class _Entity:
-        id = uuid4()
-        register_id = TEST_REGISTER_ID
-        name = TEST_ORG_NAME
-        scopes = None
-        created_at = now.now(timezone.utc)
-        deleted_at = None
-
-    model = Organization.model_validate(_Entity())
-    assert model.scopes is None
+def test_update_missing_delete_should_raise() -> None:
+    with pytest.raises(ValidationError):
+        OrganizationUpdate(  # type: ignore[call-arg]
+            external_id=TEST_EXTERNAL_ID,
+            name=TEST_ORG_NAME,
+            receive_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF],
+        )
 
 
-def test_response_model_allows_scopes_no_longer_configured() -> None:
-    """Narrowing the configured allow-list must not make existing records unreadable."""
-
-    class _Entity:
-        id = uuid4()
-        register_id = TEST_REGISTER_ID
-        name = TEST_ORG_NAME
-        scopes = "admin"
-        created_at = now.now(timezone.utc)
-        deleted_at = None
-
-    model = Organization.model_validate(_Entity())
-    assert model.scopes == "admin"
+def test_response_model_from_entity() -> None:
+    entity = OrganizationEntity(
+        id=uuid4(),
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        receive_personal_id_types=[PersonalIdTypeEntity(name=PersonalIdType.OPRF)],
+        request_personal_id_types=[PersonalIdTypeEntity(name=PersonalIdType.OPRF)],
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        deleted_at=None,
+    )
+    model = Organization.model_validate(entity.to_dict())
+    assert model.id == entity.id

@@ -8,13 +8,16 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
+from sqlalchemy.exc import IntegrityError
 
 from app import container
 from app.config import get_config
+from app.db.exception_handlers import translate_integrity_error_handler
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import Log
 from app.logging.middleware import RequestContextMiddleware, restore_request_context
 from app.middleware.stats import StatsdMiddleware
+from app.routers.certificate import router as certificate_router
 from app.routers.client import router as client_router
 from app.routers.default import router as default_router
 from app.routers.health import router as health_router
@@ -137,13 +140,16 @@ def setup_fastapi() -> FastAPI:
         correlation_id_expected=config.logging.correlation_id_expected,
     )
 
-    routers = [default_router, health_router, organization_router, client_router, resolve_router]
+    routers = [default_router, health_router, organization_router, client_router, resolve_router, certificate_router]
 
     for router in routers:
         fastapi.include_router(router)
 
-    fastapi.exception_handler(RequestValidationError)(request_validation_exception_handler)
-    fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
+    fastapi.exception_handlers = {
+        RequestValidationError: request_validation_exception_handler,
+        IntegrityError: translate_integrity_error_handler,
+        Exception: _unhandled_exception_handler,
+    }
 
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")
