@@ -1,3 +1,4 @@
+from app.db.models.base import PersonalIdType
 from uuid import UUID
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -27,8 +28,8 @@ class OrganizationFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     external_id: Oin = Field(..., description=REGISTER_ID_DESCRIPTION)
     name: str = Field(..., description=NAME_DESCRIPTION, example="OrganizationName")
-    receive_personal_id_types: list[str] = Field(example=["oprf"])
-    request_personal_id_types: list[str] = Field(example=["oprf"])
+    receive_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
+    request_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
 
 
 class OrganizationCreate(OrganizationFields):

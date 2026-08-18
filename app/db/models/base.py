@@ -1,3 +1,4 @@
+from enum import Enum, StrEnum
 from datetime import datetime
 from uuid import UUID, uuid4
 
@@ -7,6 +8,11 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 class Base(DeclarativeBase):
     pass
+
+
+class PersonalIdType(StrEnum):
+    OPRF = "oprf"
+    OPRF_2 = "oprf2"
 
 
 # receive_authorization_association_table = Table(

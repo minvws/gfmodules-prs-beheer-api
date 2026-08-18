@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError, DatabaseError
 from app.db.session import DbSession
 from app.models.organization import Organization
 from app.db.repository.organization import OrganizationRepository
@@ -91,25 +92,36 @@ class ClientService:
 
     def update_one(self, id: UUID, organization_id, update: ClientUpdate) -> Client:
         with self.db.get_db_session() as session:
-            organization = self._get_organization_or_404(session, organization_id)
+            try:
+                print("HIHEHIRIHEHIREHIHEIHIEHIEIHHIEHEIR")
+                logger.warning("WHATSUP!!!")
+                organization = self._get_organization_or_404(session, organization_id)
 
-            request_by_pid = {item.personal_id_type: item for item in organization.request_personal_id_types}
-            not_in_organization = [pid for pid in update.request_personal_id_types if pid not in request_by_pid]
-            if not_in_organization:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
-                )
+                request_by_pid = {item.personal_id_type: item for item in organization.request_personal_id_types}
+                not_in_organization = [pid for pid in update.request_personal_id_types if pid not in request_by_pid]
+                if not_in_organization:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
+                    )
 
-            repo = session.get_repository(ClientRepository)
-            client_entity: ClientEntity = repo.get_one(organization_id, id)
-            if not client_entity:
-                logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
-                raise HTTPException(status_code=404)
-            client_entity.updated_at = datetime.now(tz=timezone.utc)
-            client_entity.external_id = update.external_id
-            client_entity.common_name = update.common_name
-            ClientService.update_request_personal_id_types(client_entity, update, request_by_pid)
+                repo = session.get_repository(ClientRepository)
+                client_entity: ClientEntity = repo.get_one(organization_id, id)
+                if not client_entity:
+                    logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
+                    raise HTTPException(status_code=404)
+                client_entity.updated_at = datetime.now(tz=timezone.utc)
+                client_entity.external_id = update.external_id
+                client_entity.common_name = update.common_name
+                ClientService.update_request_personal_id_types(client_entity, update, request_by_pid)
+            except IntegrityError as ie:
+                print("HIER!!!")
+                print(ie)
+            except DatabaseError as ie:
+                print("HIER!!!222222")
+                print(ie)
+            except Exception as e:
+                print(e)
             session.commit()
             return Client(**client_entity.to_dict())
 

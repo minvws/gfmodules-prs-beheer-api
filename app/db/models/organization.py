@@ -30,6 +30,17 @@ class OrganizationEntity(Base):
     # need to support additional external_id types.
     external_id: Mapped[Oin] = mapped_column(OinType)
     name: Mapped[str] = mapped_column(String)
+
+    clients: Mapped[list["ClientEntity"]] = relationship("ClientEntity")
+
+    receive_personal_id_types: Mapped[list["OrganizationReceivePersonalIdTypeEntity"]] = relationship(
+        "OrganizationReceivePersonalIdTypeEntity", cascade="delete-orphan"
+    )
+
+    request_personal_id_types: Mapped[list["OrganizationRequestPersonalIdTypeEntity"]] = relationship(
+        "OrganizationRequestPersonalIdTypeEntity", cascade="delete-orphan"
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -45,21 +56,13 @@ class OrganizationEntity(Base):
         nullable=True,
     )
 
-    receive_personal_id_types: Mapped[list["OrganizationReceivePersonalIdTypeEntity"]] = relationship(
-        "OrganizationReceivePersonalIdTypeEntity", cascade="all, delete-orphan"
-    )
-
-    request_personal_id_types: Mapped[list["OrganizationRequestPersonalIdTypeEntity"]] = relationship(
-        "OrganizationRequestPersonalIdTypeEntity", cascade="all, delete-orphan"
-    )
-
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": str(self.id),
             "external_id": str(self.external_id),
             "name": self.name,
-            "receive_personal_id_types": [ra.personal_id_type for ra in self.receive_personal_id_types],
-            "request_personal_id_types": [ra.personal_id_type for ra in self.request_personal_id_types],
+            "receive_personal_id_types": [str(ra.personal_id_type) for ra in self.receive_personal_id_types],
+            "request_personal_id_types": [str(ra.personal_id_type) for ra in self.request_personal_id_types],
             "created_at": self.created_at,
             "updated_at": self.updated_at,
             "deleted_at": self.deleted_at,
