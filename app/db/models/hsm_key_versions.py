@@ -1,24 +1,21 @@
-from app.db.types.oin import OinType
-from app.models.oin import Oin
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import UUID, DateTime, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.entities.base import Base
+from app.db.models.base import PrsBase
 
 
-class HsmKeyVersion(Base):
+class HsmKeyVersion(PrsBase):
     __tablename__ = "hsm_key_versions"
-    __table_args__ = {"schema": "prs"}
 
+    # TODO GB: Create initial hsmKeyVersion when organization is created
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[Oin] = mapped_column(
+    organization_id: Mapped[uuid.UUID] = mapped_column(
         "organization_id",
-        OinType(),
+        UUID,
         nullable=False,
     )
     version: Mapped[int] = mapped_column("version", Integer, nullable=False)

@@ -1,19 +1,19 @@
-from sqlalchemy.exc import IntegrityError, DatabaseError
-from app.db.session import DbSession
-from app.models.organization import Organization
-from app.db.repository.organization import OrganizationRepository
-from app.db.models.client_request_personal_id_type import ClientRequestPersonalIdTypeEntity
-from app.models.client import Client, ClientCreate, ClientUpdate
-from fastapi import HTTPException
 import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+from fastapi import HTTPException
+
 from app.db.db import Database
 from app.db.models.client import ClientEntity
+from app.db.models.client_request_personal_id_type import ClientRequestPersonalIdTypeEntity
+from app.db.models.organization import OrganizationEntity
+from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
 from app.db.repository.client import ClientRepository
+from app.db.repository.organization import OrganizationRepository
+from app.db.session import DbSession
+from app.models.client import Client, ClientCreate, ClientUpdate
 from app.models.oin import Oin
-from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
 
@@ -92,36 +92,25 @@ class ClientService:
 
     def update_one(self, id: UUID, organization_id, update: ClientUpdate) -> Client:
         with self.db.get_db_session() as session:
-            try:
-                print("HIHEHIRIHEHIREHIHEIHIEHIEIHHIEHEIR")
-                logger.warning("WHATSUP!!!")
-                organization = self._get_organization_or_404(session, organization_id)
+            organization = self._get_organization_or_404(session, organization_id)
 
-                request_by_pid = {item.personal_id_type: item for item in organization.request_personal_id_types}
-                not_in_organization = [pid for pid in update.request_personal_id_types if pid not in request_by_pid]
-                if not_in_organization:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
-                    )
+            request_by_pid = {item.personal_id_type: item for item in organization.request_personal_id_types}
+            not_in_organization = [pid for pid in update.request_personal_id_types if pid not in request_by_pid]
+            if not_in_organization:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
+                )
 
-                repo = session.get_repository(ClientRepository)
-                client_entity: ClientEntity = repo.get_one(organization_id, id)
-                if not client_entity:
-                    logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
-                    raise HTTPException(status_code=404)
-                client_entity.updated_at = datetime.now(tz=timezone.utc)
-                client_entity.external_id = update.external_id
-                client_entity.common_name = update.common_name
-                ClientService.update_request_personal_id_types(client_entity, update, request_by_pid)
-            except IntegrityError as ie:
-                print("HIER!!!")
-                print(ie)
-            except DatabaseError as ie:
-                print("HIER!!!222222")
-                print(ie)
-            except Exception as e:
-                print(e)
+            repo = session.get_repository(ClientRepository)
+            client_entity: ClientEntity = repo.get_one(organization_id, id)
+            if not client_entity:
+                logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
+                raise HTTPException(status_code=404)
+            client_entity.updated_at = datetime.now(tz=timezone.utc)
+            client_entity.external_id = update.external_id
+            client_entity.common_name = update.common_name
+            ClientService.update_request_personal_id_types(client_entity, update, request_by_pid)
             session.commit()
             return Client(**client_entity.to_dict())
 
@@ -129,14 +118,12 @@ class ClientService:
     def update_request_personal_id_types(
         client_entity: ClientEntity,
         client_update: ClientUpdate,
-        request_by_pid: dict[str, OrganiztionRequestPersonalIdTypeEntity],
+        request_by_pid: dict[str, OrganizationRequestPersonalIdTypeEntity],
     ):
-        current = set(
-            [
-                _type.organization_request_personal_id_type.personal_id_type
-                for _type in client_entity.request_personal_id_types
-            ]
-        )
+        current = {
+            _type.organization_request_personal_id_type.personal_id_type
+            for _type in client_entity.request_personal_id_types
+        }
         updated = set(client_update.request_personal_id_types)
 
         to_add = updated - current

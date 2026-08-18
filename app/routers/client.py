@@ -1,18 +1,14 @@
-from app.db.models.client import ClientEntity
-from app.models.oin import Oin
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from fastapi.responses import Response
-from sqlalchemy.exc import IntegrityError
 
 from app.container import get_client_service, get_organization_service
+from app.db.models.client import ClientEntity
 from app.logging.events import Log
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
 from app.services.client import ClientService
-from app.services.exceptions import ScopesNotGrantedError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -29,30 +25,17 @@ def register(
     organization_id: UUID,
     data: Annotated[ClientCreate, Body()],
     service: Annotated[ClientService, Depends(get_client_service)],
-) -> ClientEntity:
+) -> Client:
     logger.debug(
         "Creating client with organization_id=%s external_id=%s common_name=%s",
         organization_id,
         data.external_id,
         data.common_name,
     )
-    try:
-        result = service.create_one(
-            organization_id,
-            data,
-        )
-    except IntegrityError as e:
-        raise e
-        # logger.warning(
-        #    "Client create conflict organization_id=%s oin=%s common_name=%s",
-        #    organization_id,
-        #    data.oin,
-        #    data.common_name,
-        # )
-        # raise HTTPException(
-        #    status_code=409,
-        #    detail="A client with this oin / common_name is already registered for this organization.",
-        # )
+    result = service.create_one(
+        organization_id,
+        data,
+    )
     Log.event(
         logger,
         Log.CLIENT_REGISTERED,

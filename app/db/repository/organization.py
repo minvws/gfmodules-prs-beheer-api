@@ -1,14 +1,14 @@
-from typing import Any
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, select, update
+from sqlalchemy import ColumnElement, and_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
-from app.db.repository.base import RepositoryBase, scopes_contains_conditions
+from app.db.repository.base import RepositoryBase
 from app.models.oin import Oin
 
 

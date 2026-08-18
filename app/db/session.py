@@ -11,7 +11,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql.selectable import TypedReturnsRows
 from typing_extensions import Self
 
-from app.db.models.base import Base
 from app.db.repository import base
 
 """

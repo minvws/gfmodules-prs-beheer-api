@@ -1,4 +1,5 @@
+from app.db.models.client_request_personal_id_type import ClientRequestPersonalIdTypeEntity
+
 from .organization import OrganizationEntity
 from .organization_receive_personal_id_type import OrganizationReceivePersonalIdTypeEntity
 from .organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
-from app.db.models.client_request_personal_id_type import ClientRequestPersonalIdTypeEntity

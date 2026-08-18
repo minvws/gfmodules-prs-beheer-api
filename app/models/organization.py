@@ -1,9 +1,10 @@
-from app.db.models.base import PersonalIdType
-from uuid import UUID
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from uuid import UUID
 
-from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.db.models.base import PersonalIdType
+from app.models.base import INCLUDE_DELETED_DESCRIPTION
 from app.models.oin import Oin
 
 REGISTER_ID_DESCRIPTION = "The OIN of the organization"
