@@ -54,6 +54,28 @@ CREATE TABLE migrations (
     checksum VARCHAR(64) NOT NULL
   );
 EOF
+else
+  MIGRATION_TABLE_ID_DEFAULT=$(psql prs_beheer_api_db -tA -c "
+  SELECT COALESCE(pg_get_expr(ad.adbin, ad.adrelid), '')
+  FROM pg_attribute attr
+  JOIN pg_class cls ON cls.oid = attr.attrelid
+  JOIN pg_namespace nsp ON nsp.oid = cls.relnamespace
+  LEFT JOIN pg_attrdef ad ON ad.adrelid = attr.attrelid AND ad.adnum = attr.attnum
+  WHERE nsp.nspname = 'public'
+    AND cls.relname = 'migrations'
+    AND attr.attname = 'id'
+    AND NOT attr.attisdropped;
+")
+
+  if [ "$MIGRATION_TABLE_ID_DEFAULT" != "nextval('migrations_id_seq'::regclass)" ]; then
+    echo -e "${YELLOW}⚠️ Migration table id column does not use the expected sequence default. Repairing it.${NC}"
+
+    cat << EOF >> "$TEMP_FILE"
+CREATE SEQUENCE IF NOT EXISTS migrations_id_seq OWNED BY migrations.id;
+ALTER TABLE migrations ALTER COLUMN id SET DEFAULT nextval('migrations_id_seq');
+SELECT setval('migrations_id_seq', COALESCE((SELECT MAX(id) FROM migrations), 0) + 1, false);
+EOF
+  fi
 fi
 
 pending_migrations=()
