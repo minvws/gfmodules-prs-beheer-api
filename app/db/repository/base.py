@@ -3,8 +3,6 @@ from typing import TypeVar
 from sqlalchemy import ColumnElement, literal
 from sqlalchemy.orm import Mapped
 
-from app.db import session
-
 
 def scopes_contains_conditions(column: Mapped[str | None], requested: str | None) -> list[ColumnElement[bool]]:
     """Build conditions matching rows whose space-delimited scope column contains every requested scope.
