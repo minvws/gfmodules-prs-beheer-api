@@ -1,18 +1,17 @@
-from enum import Enum, StrEnum
-from datetime import datetime
-from uuid import UUID, uuid4
+from enum import StrEnum
 
-from sqlalchemy import TIMESTAMP, String, Uuid, func, Column, ForeignKey, Table
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import MetaData
+from sqlalchemy.orm import declarative_base
 
+admin_metadata_obj = MetaData(schema="admin")
+AdminBase = declarative_base(metadata=admin_metadata_obj)
 
-class Base(DeclarativeBase):
-    pass
+prs_metadata_obj = MetaData(schema="admin")
+PrsBase = declarative_base(metadata=prs_metadata_obj)
 
 
 class PersonalIdType(StrEnum):
     OPRF = "oprf"
-    OPRF_2 = "oprf2"
 
 
 # receive_authorization_association_table = Table(

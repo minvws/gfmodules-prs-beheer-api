@@ -1,9 +1,9 @@
-from app.db.models.base import PersonalIdType
 from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.db.models.base import PersonalIdType
 from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
 from app.models.oin import Oin
 

@@ -1,21 +1,16 @@
-from sqlalchemy.exc import IntegrityError
-from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
-from app.db.models.organization_receive_personal_id_type import OrganizationReceivePersonalIdTypeEntity
-from sqlalchemy import ForeignKey
-from typing import List
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.db.models.base import Base, PersonalIdType
-from app.models.organization import OrganizationCreate, Organization, OrganizationUpdate
-from fastapi import HTTPException
 import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from app import scope_utils
+from fastapi import HTTPException
+
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
+from app.db.models.organization_receive_personal_id_type import OrganizationReceivePersonalIdTypeEntity
+from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
 from app.db.repository.organization import OrganizationRepository
 from app.models.oin import Oin
+from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +86,7 @@ class OrganizationService:
     def update_receive_personal_id_types(
         organization_entity: OrganizationEntity, organization_update: OrganizationUpdate
     ):
-        current = set([_type.personal_id_type for _type in organization_entity.receive_personal_id_types])
+        current = {_type.personal_id_type for _type in organization_entity.receive_personal_id_types}
         updated = set(organization_update.receive_personal_id_types)
 
         to_add = updated - current
@@ -109,7 +104,7 @@ class OrganizationService:
     def update_request_personal_id_types(
         organization_entity: OrganizationEntity, organization_update: OrganizationUpdate
     ):
-        current = set([_type.personal_id_type for _type in organization_entity.request_personal_id_types])
+        current = {_type.personal_id_type for _type in organization_entity.request_personal_id_types}
         updated = set(organization_update.request_personal_id_types)
 
         to_add = updated - current

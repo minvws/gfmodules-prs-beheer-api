@@ -1,25 +1,16 @@
 from __future__ import annotations
-from pydantic.v1.schema import schema
+
 import uuid
-from datetime import timezone, datetime
+from datetime import datetime, timezone
 
-from typing import TYPE_CHECKING, Any
+from sqlalchemy import UUID, DateTime, Enum, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
 
-from sqlalchemy import Index, String, text, DateTime, UUID, ForeignKey, Enum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.models.base import Base, PersonalIdType
-from app.db.types.oin_type import OinType
-from app.models.oin import Oin
-
-if TYPE_CHECKING:
-    from app.db.models.client import ClientEntity
-    from app.db.models.organization import OrganizationEntity
+from app.db.models.base import AdminBase, PersonalIdType
 
 
-class OrganizationRequestPersonalIdTypeEntity(Base):
+class OrganizationRequestPersonalIdTypeEntity(AdminBase):
     __tablename__ = "organization_request_personal_id_types"
-    __table_args__ = {"schema": "admin"}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

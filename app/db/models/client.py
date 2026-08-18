@@ -1,25 +1,22 @@
 from __future__ import annotations
-from datetime import datetime, timezone
-import uuid
 
+import uuid
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, Index, String, text, UUID, DateTime
+from sqlalchemy import UUID, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import Uuid
 
-from app.db.models.base import Base
+from app.db.models.base import AdminBase
 from app.db.types.oin_type import OinType
 from app.models.oin import Oin
 
 if TYPE_CHECKING:
     from app.db.models.client_request_personal_id_type import ClientRequestPersonalIdTypeEntity
-    from app.db.models.organization import OrganizationEntity
 
 
-class ClientEntity(Base):
+class ClientEntity(AdminBase):
     __tablename__ = "clients"
-    __table_args__ = {"schema": "admin"}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -36,7 +33,7 @@ class ClientEntity(Base):
 
     common_name: Mapped[str] = mapped_column(String)
 
-    request_personal_id_types: Mapped[list["ClientRequestPersonalIdTypeEntity"]] = relationship(
+    request_personal_id_types: Mapped[list[ClientRequestPersonalIdTypeEntity]] = relationship(
         "ClientRequestPersonalIdTypeEntity", cascade="all, delete-orphan"
     )
 

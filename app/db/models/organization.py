@@ -1,13 +1,13 @@
 from __future__ import annotations
-import uuid
-from datetime import timezone, datetime
 
+import uuid
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Index, String, text, DateTime, UUID
+from sqlalchemy import UUID, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.models.base import Base
+from app.db.models.base import AdminBase
 from app.db.types.oin_type import OinType
 from app.models.oin import Oin
 
@@ -17,9 +17,8 @@ if TYPE_CHECKING:
     from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
 
 
-class OrganizationEntity(Base):
+class OrganizationEntity(AdminBase):
     __tablename__ = "organizations"
-    __table_args__ = {"schema": "admin"}
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -31,13 +30,13 @@ class OrganizationEntity(Base):
     external_id: Mapped[Oin] = mapped_column(OinType)
     name: Mapped[str] = mapped_column(String)
 
-    clients: Mapped[list["ClientEntity"]] = relationship("ClientEntity")
+    clients: Mapped[list[ClientEntity]] = relationship("ClientEntity")
 
-    receive_personal_id_types: Mapped[list["OrganizationReceivePersonalIdTypeEntity"]] = relationship(
+    receive_personal_id_types: Mapped[list[OrganizationReceivePersonalIdTypeEntity]] = relationship(
         "OrganizationReceivePersonalIdTypeEntity", cascade="delete-orphan"
     )
 
-    request_personal_id_types: Mapped[list["OrganizationRequestPersonalIdTypeEntity"]] = relationship(
+    request_personal_id_types: Mapped[list[OrganizationRequestPersonalIdTypeEntity]] = relationship(
         "OrganizationRequestPersonalIdTypeEntity", cascade="delete-orphan"
     )
 
