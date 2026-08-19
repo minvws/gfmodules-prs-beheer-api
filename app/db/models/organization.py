@@ -13,6 +13,7 @@ from app.models.oin import Oin
 
 if TYPE_CHECKING:
     from app.db.models.client import ClientEntity
+    from app.db.models.certificate import CertificateEntity
     from app.db.models.organization_receive_personal_id_type import OrganizationReceivePersonalIdTypeEntity
     from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
 
@@ -31,6 +32,8 @@ class OrganizationEntity(AdminBase):
     name: Mapped[str] = mapped_column(String)
 
     clients: Mapped[list[ClientEntity]] = relationship("ClientEntity")
+
+    certificates: Mapped[list[CertificateEntity]] = relationship("CertificateEntity")
 
     receive_personal_id_types: Mapped[list[OrganizationReceivePersonalIdTypeEntity]] = relationship(
         "OrganizationReceivePersonalIdTypeEntity", cascade="all, delete-orphan"

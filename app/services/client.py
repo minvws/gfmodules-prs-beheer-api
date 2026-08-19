@@ -12,7 +12,7 @@ from app.db.models.organization_request_personal_id_type import OrganizationRequ
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
 from app.db.session import DbSession
-from app.models.client import Client, ClientCreate, ClientUpdate
+from app.models.client import Client, ClientCreate, ClientUpdate, ClientResolveRequest
 from app.models.oin import Oin
 
 logger = logging.getLogger(__name__)
@@ -152,12 +152,7 @@ class ClientService:
             session.commit()
             return Client(**client_entity.to_dict())
 
-    def resolve(
-        self,
-        oin: Oin,
-        common_name: str,
-        register_id: Oin,
-    ) -> ClientEntity | None:
+    def resolve(self, client_resolve_request: ClientResolveRequest) -> ClientEntity | None:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
             return repo.get_by_credentials(common_name=common_name, oin=oin, register_id=register_id)

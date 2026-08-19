@@ -1,3 +1,4 @@
+from app.services.certificate import CertificateService
 import logging
 
 import inject
@@ -26,6 +27,9 @@ def container_config(binder: inject.Binder) -> None:
     client_service = ClientService(db)
     binder.bind(ClientService, client_service)
 
+    certificate_service = CertificateService(db)
+    binder.bind(CertificateService, certificate_service)
+
 
 def get_database() -> Database:
     return inject.instance(Database)
@@ -37,6 +41,10 @@ def get_organization_service() -> OrganizationService:
 
 def get_client_service() -> ClientService:
     return inject.instance(ClientService)
+
+
+def get_certificate_service() -> CertificateService:
+    return inject.instance(CertificateService)
 
 
 def configure() -> None:

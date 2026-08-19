@@ -5,9 +5,8 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.container import get_client_service, get_organization_service
-from app.db.models.client import ClientEntity
 from app.logging.events import Log
-from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
+from app.models.client import Client, ClientQueryParams, ClientFields
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 
@@ -23,7 +22,7 @@ router = APIRouter(prefix="/organizations/{organization_id}/clients", tags=["Cli
 )
 def register(
     organization_id: UUID,
-    data: Annotated[ClientCreate, Body()],
+    data: Annotated[ClientFields, Body()],
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Client:
     logger.debug(
@@ -93,10 +92,10 @@ def get_many(
 def update(
     organization_id: UUID,
     id: UUID,
-    body: ClientUpdate,
+    body: ClientFields,
     service: Annotated[ClientService, Depends(get_client_service)],
     organization_service: Annotated[OrganizationService, Depends(get_organization_service)],
-) -> ClientEntity:
+) -> Client:
     fields = body.model_dump(exclude_unset=True)
     logger.debug(
         "Updating client organization_id=%s client_id=%s fields=%s",
