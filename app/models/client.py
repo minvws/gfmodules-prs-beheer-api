@@ -29,32 +29,20 @@ class ClientFields(BaseModel):
     request_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
 
 
-class ClientCreate(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    external_id: Oin = Field(..., description=EXTERNAL_ID_DESCRIPTION)
-    common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
-    request_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
-
-
-class ClientUpdate(ClientFields):
-    pass
-
-
 class ClientQueryParams(BaseModel):
     external_id: Oin | None = Field(default=None, description=EXTERNAL_ID_DESCRIPTION)
     common_name: str | None = Field(default=None, description=COMMON_NAME_DESCRIPTION)
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Client(Base, ClientReadFields, ClientCreate):
+class Client(Base, ClientReadFields, ClientFields):
     organization_id: UUID
 
 
 class ClientResolveRequest(BaseModel):
     client_organization_id: Oin = Field(..., description=EXTERNAL_ID_DESCRIPTION)
     client_common_name: str = Field(..., description=COMMON_NAME_DESCRIPTION)
-    organization_id: UUID = Field(..., description=ORG_OIN_DESCRIPTION)
+    organization_id: Oin = Field(..., description=ORG_OIN_DESCRIPTION)
 
 
 class ClientResolveResponse(BaseModel):

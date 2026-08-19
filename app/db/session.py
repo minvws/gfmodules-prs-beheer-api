@@ -53,10 +53,12 @@ R = TypeVar("R", bound=tuple[Any, ...])
 class DbSession:
     _engine: Engine
     _retry_backoff: list[float]
+    _commit: bool
 
-    def __init__(self, engine: Engine, retry_backoff: list[float]) -> None:
+    def __init__(self, engine: Engine, retry_backoff: list[float], commit: bool) -> None:
         self._engine = engine
         self._retry_backoff = retry_backoff
+        self._commit = commit
 
     def __enter__(self) -> Self:
         """
@@ -74,6 +76,8 @@ class DbSession:
         """
         Close the session when exiting the context manager
         """
+        if exc_type is None and exc_val is None and self._commit:
+            self.session.commit()
         self.session.close()
 
     def get_repository(self, repository_class: type["base.TRepositoryBase_co"]) -> "base.TRepositoryBase_co":
