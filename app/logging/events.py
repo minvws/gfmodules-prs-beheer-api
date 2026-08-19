@@ -91,6 +91,15 @@ class Log:
             _SIEM: ("error_reason",),
         },
     )
+    SYS_MISSING_CORRELATION_ID = LogEvent(  # PRS-SYS-007
+        "270407",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {
+            _APP: ("endpoint", "method"),
+            _SIEM: ("endpoint", "method"),
+        },
+    )
     ACCESS_REQUEST = LogEvent(  # NVI-AUTH-101
         "260450",
         logging.INFO,
