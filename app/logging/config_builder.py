@@ -39,6 +39,7 @@ class LogConfigBuilder:
                 "stream": "ext://sys.stdout",
             }
         else:
+            print("DIT TOCH NIET?!")
             console = {
                 "class": "logging.StreamHandler",
                 "level": self.loglevel,

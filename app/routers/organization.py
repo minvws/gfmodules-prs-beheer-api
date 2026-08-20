@@ -3,13 +3,12 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from fastapi.responses import Response
 from sqlalchemy.exc import IntegrityError
 
 from app.container import get_organization_service
 from app.logging.events import Log
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
-from app.services.exceptions import OrganizationHasClientsError, ScopesInUseError
+from app.services.exceptions import OrganizationHasClientsError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -21,19 +20,18 @@ _register_id_conflict_message = "There is an active organization with the same r
 def register(
     data: Annotated[OrganizationCreate, Body()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
-) -> Any:
-    logger.debug("Creating organization with register_id=%s", data.register_id)
+) -> Organization:
+    logger.debug("Creating organization with id=%s", data.external_id)
     try:
-        result = service.create_one(**data.model_dump())
+        result = service.create_one(data)
     except IntegrityError:
-        logger.warning("Organization create conflict for register_id=%s", data.register_id)
+        logger.warning("Organization create conflict for register_id=%s", data.external_id)
         raise HTTPException(status_code=409, detail=_register_id_conflict_message)
     Log.event(
         logger,
         Log.ORGANIZATION_REGISTERED,
         "organization registered",
-        organisatie_oin=str(data.register_id),
-        bevoegdheden=data.scopes,
+        organisatie_oin=str(data.external_id),
     )
     return result
 
@@ -42,7 +40,7 @@ def register(
 def get_by_id(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
-) -> Any:
+) -> Organization:
     logger.debug("Fetching organization id=%s", id)
     result = service.get_one(id)
     if result is None:
@@ -56,6 +54,7 @@ def get_many(
     params: Annotated[OrganizationQueryParams, Query()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
+    # TODO GB: Include deleted
     logger.debug(
         "Listing organizations register_id=%s name=%s include_deleted=%s",
         params.register_id,
@@ -70,53 +69,26 @@ def update(
     id: UUID,
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
-) -> Any:
-    current = service.get_one(id)
-    if current is None:
-        logger.debug("Organization not found for update id=%s", id)
-        raise HTTPException(status_code=404)
-
-    fields = body.model_dump()
-    logger.debug("Updating organization id=%s fields=%s", id, list(fields.keys()))
-    try:
-        result = service.update_one(id, **fields)
-    except ScopesInUseError as error:
-        logger.warning("Organization update rejected id=%s: %s", id, error)
-        raise HTTPException(status_code=409, detail=str(error))
-    except IntegrityError:
-        logger.warning("Organization update conflict id=%s", id)
-        raise HTTPException(status_code=409, detail=_register_id_conflict_message)
-    if result is None:
-        raise HTTPException(status_code=404)
-    if fields["scopes"] != current.scopes:
-        Log.event(
-            logger,
-            Log.SCOPES_CHANGED,
-            "organization scopes changed",
-            organisatie_oin=str(result.register_id),
-            changed_scopes=fields["scopes"],
-        )
-    return result
+) -> Organization:
+    logger.debug("Updating organization id=%s fields=%s", id, list(body.model_dump().keys()))
+    return service.update_one(id, body)
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", response_model=Organization)
 def delete(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
-) -> Response:
+) -> Organization:
     logger.debug("Deleting organization id=%s", id)
     try:
         result = service.delete_one(id)
     except OrganizationHasClientsError as error:
         logger.warning("Organization delete rejected id=%s: %s", id, error)
         raise HTTPException(status_code=409, detail=str(error))
-    if result is None:
-        logger.debug("Organization not found for delete id=%s", id)
-        raise HTTPException(status_code=404)
     Log.event(
         logger,
         Log.ORGANIZATION_WITHDRAWN,
         "organization registration withdrawn",
-        organisatie_oin=str(result.register_id),
+        organisatie_oin=str(result.id),
     )
-    return Response(status_code=204)
+    return result

@@ -1,22 +1,44 @@
-from datetime import datetime
-from uuid import UUID, uuid4
+from typing import Any
+from datetime import datetime, timezone
+from sqlalchemy import MetaData, DateTime
+from sqlalchemy.orm import DeclarativeBase, mapped_column, Mapped
 
-from sqlalchemy import TIMESTAMP, String, Uuid, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+admin_metadata_obj = MetaData(schema="admin")
+
+prs_metadata_obj = MetaData(schema="prs")
 
 
-class Base(DeclarativeBase):
+class Base:
     pass
 
 
-class CommonColumns(Base):
-    __abstract__ = True
+class AdminBase(Base, DeclarativeBase):
+    metadata = admin_metadata_obj
 
-    id: Mapped[UUID] = mapped_column("id", Uuid, primary_key=True, default=uuid4)
-    scopes: Mapped[str | None] = mapped_column("scopes", String)
-    created_at: Mapped[datetime] = mapped_column("created_at", TIMESTAMP, server_default=func.now())
-    deleted_at: Mapped[datetime | None] = mapped_column("deleted_at", TIMESTAMP)
 
-    def __repr__(self) -> str:
-        props = ", ".join([f"{column.key}={self.__getattribute__(column.key)}" for column in self.__table__.columns])
-        return f"<{self.__class__.__name__}=({props})>"
+class PrsBase(Base, DeclarativeBase):
+    metadata = prs_metadata_obj
+
+
+class WithTimestamps:
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.now(tz=timezone.utc),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=datetime.now(tz=timezone.utc),
+    )
+    deleted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "deleted_at": self.deleted_at,
+        }

@@ -1,13 +1,14 @@
 from collections.abc import Sequence
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, and_, select, update
+from sqlalchemy import ColumnElement, and_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app.db.decorator import repository
 from app.db.models.organization import OrganizationEntity
-from app.db.repository.base import RepositoryBase, scopes_contains_conditions
+from app.db.repository.base import RepositoryBase
 from app.models.oin import Oin
 
 
@@ -23,7 +24,7 @@ class OrganizationRepository(RepositoryBase):
             raise
 
     def get_one(self, id: UUID) -> OrganizationEntity | None:
-        stmt = select(OrganizationEntity).where(self._and_clause(id))
+        stmt = select(OrganizationEntity).where(OrganizationEntity.id == id)
         return self.db_session.session.execute(stmt).scalar()
 
     def get_one_with_clients(self, id: UUID) -> OrganizationEntity | None:
@@ -40,7 +41,7 @@ class OrganizationRepository(RepositoryBase):
         stmt = select(OrganizationEntity).where(
             and_(
                 OrganizationEntity.register_id == register_id,
-                OrganizationEntity.deleted_at.is_(None),
+                OrganizationEntity.inactive_at.is_(None),
             )
         )
         return self.db_session.session.execute(stmt).scalar()
@@ -49,7 +50,7 @@ class OrganizationRepository(RepositoryBase):
         self,
         register_id: Oin | None = None,
         name: str | None = None,
-        scopes: str | None = None,
+        scopes: Any | None = None,
         include_deleted: bool = False,
     ) -> Sequence[OrganizationEntity]:
         conditions: list[ColumnElement[bool]] = []
@@ -59,25 +60,10 @@ class OrganizationRepository(RepositoryBase):
             conditions.append(OrganizationEntity.register_id == register_id)
         if name:
             conditions.append(OrganizationEntity.name == name)
-        conditions.extend(scopes_contains_conditions(OrganizationEntity.scopes, scopes))
         stmt = select(OrganizationEntity)
         if conditions:
             stmt = stmt.where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
-
-    def update(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:
-        try:
-            valid_columns = set(OrganizationEntity.__table__.columns.keys())
-            target = {key: kwargs[key] for key in kwargs if key in valid_columns}
-            if not target:
-                return None
-            stmt = update(OrganizationEntity).where(self._and_clause(id)).values(target).returning(OrganizationEntity)
-            result = self.db_session.session.execute(stmt).scalar_one_or_none()
-            self.db_session.commit()
-            return result
-        except SQLAlchemyError:
-            self.db_session.rollback()
-            raise
 
     def _and_clause(self, id: UUID) -> ColumnElement[bool]:
         return and_(

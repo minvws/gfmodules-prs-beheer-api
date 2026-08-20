@@ -1,3 +1,5 @@
+from app.db.exception_handlers import translate_integrity_error_handler
+from sqlalchemy.exc import IntegrityError
 import logging
 from logging.config import dictConfig
 from typing import Any
@@ -20,6 +22,7 @@ from app.routers.default import router as default_router
 from app.routers.health import router as health_router
 from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
+from app.routers.certificate import router as certificate_router
 
 logger = logging.getLogger(__name__)
 
@@ -127,12 +130,15 @@ def setup_fastapi() -> FastAPI:
         correlation_id_expected=config.logging.correlation_id_expected,
     )
 
-    routers = [default_router, health_router, organization_router, client_router, resolve_router]
+    routers = [default_router, health_router, organization_router, client_router, resolve_router, certificate_router]
 
     for router in routers:
         fastapi.include_router(router)
 
-    fastapi.exception_handler(RequestValidationError)(request_validation_exception_handler)
+    fastapi.exception_handlers = {
+        RequestValidationError: request_validation_exception_handler,
+        IntegrityError: translate_integrity_error_handler,
+    }
 
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")

@@ -14,24 +14,30 @@ services:
       - ./secrets:/src/secrets
     ports:
       - 8512:8512
+    networks:
+      - prs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8512/health"]
       timeout: 10s
       retries: 5
       start_period: 5s
-    depends_on:
-      postgres:
-        condition: service_healthy
+#    depends_on:
+#      postgres:
+#        condition: service_healthy
+#
+#  postgres:
+#    image: postgres:15
+#    environment:
+#      POSTGRES_DB: postgres
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: postgres
+#    healthcheck:
+#      test: ["CMD-SHELL", "pg_isready --user postgres"]
+#      start_period: 30s
+#      start_interval: 1s
+#    ports:
+#      - 5432:5432
 
-  postgres:
-    image: postgres:15
-    environment:
-      POSTGRES_DB: postgres
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready --user postgres"]
-      start_period: 30s
-      start_interval: 1s
-    ports:
-      - 5432:5432
+networks:
+  prs:
+    name: prs
