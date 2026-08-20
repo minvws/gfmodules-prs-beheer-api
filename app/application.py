@@ -122,7 +122,10 @@ def setup_fastapi() -> FastAPI:
 
     container.configure()
 
-    fastapi.add_middleware(RequestContextMiddleware)
+    fastapi.add_middleware(
+        RequestContextMiddleware,
+        correlation_id_expected=config.logging.correlation_id_expected,
+    )
 
     routers = [default_router, health_router, organization_router, client_router, resolve_router]
 
