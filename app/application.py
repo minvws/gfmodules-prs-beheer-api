@@ -13,7 +13,7 @@ from app import container
 from app.config import get_config
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import Log
-from app.logging.middleware import RequestContextMiddleware
+from app.logging.middleware import RequestContextMiddleware, restore_request_context
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.default import router as default_router
@@ -48,6 +48,16 @@ async def request_validation_exception_handler(
         endpoint=request.url.path,
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
+
+
+@restore_request_context
+def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error(
+        "Unhandled exception",
+        exc_info=exc,
+        extra={"exception_type": type(exc).__name__},
+    )
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 def get_uvicorn_params() -> dict[str, Any]:
@@ -133,6 +143,7 @@ def setup_fastapi() -> FastAPI:
         fastapi.include_router(router)
 
     fastapi.exception_handler(RequestValidationError)(request_validation_exception_handler)
+    fastapi.add_exception_handler(Exception, _unhandled_exception_handler)
 
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")
