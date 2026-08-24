@@ -2,16 +2,11 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select
-from sqlalchemy.orm import joinedload
 
-from app.db.decorator import repository
 from app.db.models.client import ClientEntity
-from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase
-from app.models.oin import Oin
 
 
-@repository(ClientEntity)
 class ClientRepository(RepositoryBase):
     def add_one(self, data: ClientEntity) -> ClientEntity:
         self.db_session.add(data)
@@ -25,37 +20,27 @@ class ClientRepository(RepositoryBase):
         stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
         return bool(self.db_session.session.execute(stmt).scalar())
 
-    def get_by_credentials(self, common_name: str, oin: Oin, register_id: Oin) -> ClientEntity | None:
-        stmt = (
-            select(ClientEntity)
-            .join(OrganizationEntity, ClientEntity.organization_id == OrganizationEntity.id)
-            .where(
-                and_(
-                    ClientEntity.common_name == common_name,
-                    ClientEntity.oin == oin,
-                    OrganizationEntity.register_id == register_id,
-                    OrganizationEntity.deleted_at.is_(None),
-                    ClientEntity.deleted_at.is_(None),
-                )
-            )
-            .options(joinedload(ClientEntity.organization))
-        )
-        return self.db_session.session.execute(stmt).scalar_one_or_none()
-
     def get_many(
         self,
-        organization_id: UUID,
-        external_id: Oin | None = None,
-        common_name: str | None = None,
+        organization_id: UUID | None = None,
+        client_id: UUID | None = None,
+        certificate_domain: str | None = None,
+        certificate_organization_identifier: str | None = None,
         include_deleted: bool = False,
     ) -> Sequence[ClientEntity]:
-        conditions: list[ColumnElement[bool]] = [ClientEntity.organization_id == organization_id]
+        conditions = []
+        if organization_id is not None:
+            conditions.append(ClientEntity.organization_id == organization_id)
+        if client_id is not None:
+            conditions.append(ClientEntity.id == client_id)
+        if certificate_domain is not None:
+            conditions.append(ClientEntity.certificates.any(domain=certificate_domain))
+        if certificate_organization_identifier is not None:
+            conditions.append(
+                ClientEntity.certificates.any(organization_identifier=certificate_organization_identifier)
+            )
         if not include_deleted:
             conditions.append(ClientEntity.deleted_at.is_(None))
-        if external_id:
-            conditions.append(ClientEntity.external_id == external_id)
-        if common_name:
-            conditions.append(ClientEntity.common_name == common_name)
         stmt = select(ClientEntity).where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 

@@ -80,7 +80,7 @@ class DbSession:
             self.session.commit()
         self.session.close()
 
-    def get_repository(self, repository_class: type["base.TRepositoryBase_co"]) -> "base.TRepositoryBase_co":
+    def get_repository(self, repository_class: type[base.TRepositoryBase_co]) -> base.TRepositoryBase_co:
         """
         Returns an instantiated repository for the given model class
         """

@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
-from psycopg.errors import ForeignKeyViolation
-from sqlalchemy.exc import IntegrityError
-from fastapi import HTTPException
 from uuid import UUID
+
+from fastapi import HTTPException
+
+from app.db.db import Database
 from app.db.models import CertificateEntity
 from app.db.repository.certificate import CertificateRepository
-from app.models.certificate import Certificate, CertificateQueryParams, CertificateFields
-from app.db.db import Database
+from app.models.certificate import Certificate, CertificateFields, CertificateQueryParams
 
 
 class CertificateService:
@@ -34,7 +34,9 @@ class CertificateService:
     def get_many(self, organization_id: UUID, query_params: CertificateQueryParams) -> list[Certificate]:
         with self.db.get_db_session() as session:
             certificate_repository: CertificateRepository = session.get_repository(CertificateRepository)
-            entities = certificate_repository.get_many(organization_id)
+            entities = list(
+                certificate_repository.get_many(organization_id, include_deleted=query_params.include_deleted)
+            )
             return [Certificate(**entity.to_dict()) for entity in entities]
 
     def get_one(self, organization_id: UUID, certificate_id: UUID) -> Certificate:
@@ -48,7 +50,7 @@ class CertificateService:
     def update_one(self, organization_id: UUID, certificate_id: UUID, update: CertificateFields) -> Certificate:
         with self.db.get_db_session(commit=True) as session:
             certificate_repository: CertificateRepository = session.get_repository(CertificateRepository)
-            entity: CertificateEntity = certificate_repository.get_one(organization_id, certificate_id)
+            entity = certificate_repository.get_one(organization_id, certificate_id)
             if not entity:
                 raise HTTPException(status_code=404, detail="Certificate not found")
             entity.organization_identifier = update.organization_identifier
@@ -57,9 +59,9 @@ class CertificateService:
             return Certificate(**entity.to_dict())
 
     def delete_one(self, organization_id: UUID, certificate_id: UUID) -> Certificate:
-        with self.db.get_db_session() as session:
+        with self.db.get_db_session(commit=True) as session:
             certificate_repository: CertificateRepository = session.get_repository(CertificateRepository)
-            entity: CertificateEntity = certificate_repository.get_one(organization_id, certificate_id)
+            entity = certificate_repository.get_one(organization_id, certificate_id)
             if not entity:
                 raise HTTPException(status_code=404, detail="Certificate not found")
             now = datetime.now(tz=timezone.utc)

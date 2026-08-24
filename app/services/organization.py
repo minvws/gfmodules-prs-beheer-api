@@ -6,9 +6,8 @@ from fastapi import HTTPException
 
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
-from app.db.models.organization_receive_personal_id_type import OrganizationReceivePersonalIdTypeEntity
-from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.personal_id_type import PersonalIdTypeRepository
 from app.models.oin import Oin
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 
@@ -21,20 +20,20 @@ class OrganizationService:
 
     def create_one(self, input: OrganizationCreate) -> Organization:
         with self.db.get_db_session() as session:
-            # session.add(Parent(id=1, children=[]))
             repo = session.get_repository(OrganizationRepository)
+            personal_id_type_repo = session.get_repository(PersonalIdTypeRepository)
+            receive_personal_id_types = personal_id_type_repo.get_many(
+                [str(e) for e in input.receive_personal_id_types]
+            )
+            request_personal_id_types = personal_id_type_repo.get_many(
+                [str(e) for e in input.request_personal_id_types]
+            )
             entity: OrganizationEntity = repo.add_one(
                 OrganizationEntity(
                     external_id=input.external_id,
                     name=input.name,
-                    receive_personal_id_types=[
-                        OrganizationReceivePersonalIdTypeEntity(personal_id_type=personal_id_type)
-                        for personal_id_type in input.receive_personal_id_types
-                    ],
-                    request_personal_id_types=[
-                        OrganizationRequestPersonalIdTypeEntity(personal_id_type=personal_id_type)
-                        for personal_id_type in input.request_personal_id_types
-                    ],
+                    receive_personal_id_types=receive_personal_id_types,
+                    request_personal_id_types=request_personal_id_types,
                 )
             )
             return Organization(**entity.to_dict())
@@ -45,27 +44,23 @@ class OrganizationService:
             entity: OrganizationEntity | None = repo.get_one(id)
             return Organization(**entity.to_dict()) if entity else None
 
-    def exists(self, id: Oin) -> bool:
-        with self.db.get_db_session() as session:
-            repo = session.get_repository(OrganizationRepository)
-            return repo.exists(id)
-
     def get_many(
         self,
-        register_id: Oin | None = None,
+        external_id: Oin | None = None,
         name: str | None = None,
         include_deleted: bool = False,
     ) -> list[Organization]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            entities = repo.get_many(register_id=register_id, name=name, include_deleted=include_deleted)
+            entities = repo.get_many(external_id=external_id, name=name, include_deleted=include_deleted)
 
             return [Organization(**entity.to_dict()) for entity in entities]
 
     def update_one(self, id: UUID, organization_update: OrganizationUpdate) -> Organization:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            organization_entity: OrganizationEntity = repo.get_one(id)
+            personal_id_type_repo = session.get_repository(PersonalIdTypeRepository)
+            organization_entity = repo.get_one(id)
             if not organization_entity:
                 logger.debug("Organization not found for update id=%s", id)
                 raise HTTPException(status_code=404)
@@ -76,47 +71,20 @@ class OrganizationService:
                 organization_entity.deleted_at = None
             if not organization_entity.deleted_at and organization_update.deleted:
                 organization_entity.deleted_at = datetime.now(tz=timezone.utc)
-            OrganizationService.update_receive_personal_id_types(organization_entity, organization_update)
-            OrganizationService.update_request_personal_id_types(organization_entity, organization_update)
+
+            organization_entity.receive_personal_id_types = list(
+                personal_id_type_repo.get_many(organization_update.receive_personal_id_types)
+            )
+
+            organization_pids = [pide.name for pide in organization_entity.receive_personal_id_types]
+            organization_entity.request_personal_id_types = list(
+                personal_id_type_repo.get_many(
+                    organization_pids,
+                )
+            )
 
             session.commit()
             return Organization(**organization_entity.to_dict())
-
-    @staticmethod
-    def update_receive_personal_id_types(
-        organization_entity: OrganizationEntity, organization_update: OrganizationUpdate
-    ):
-        current = {_type.personal_id_type for _type in organization_entity.receive_personal_id_types}
-        updated = set(organization_update.receive_personal_id_types)
-
-        to_add = updated - current
-        to_remove = [e for e in organization_entity.receive_personal_id_types if e.personal_id_type not in updated]
-
-        for entry in to_add:
-            organization_entity.receive_personal_id_types.append(
-                OrganizationReceivePersonalIdTypeEntity(personal_id_type=entry)
-            )
-
-        for entry in to_remove:
-            organization_entity.receive_personal_id_types.remove(entry)
-
-    @staticmethod
-    def update_request_personal_id_types(
-        organization_entity: OrganizationEntity, organization_update: OrganizationUpdate
-    ):
-        current = {_type.personal_id_type for _type in organization_entity.request_personal_id_types}
-        updated = set(organization_update.request_personal_id_types)
-
-        to_add = updated - current
-        to_remove = [e for e in organization_entity.request_personal_id_types if e.personal_id_type not in updated]
-
-        for entry in to_add:
-            organization_entity.request_personal_id_types.append(
-                OrganizationRequestPersonalIdTypeEntity(personal_id_type=entry)
-            )
-
-        for entry in to_remove:
-            organization_entity.request_personal_id_types.remove(entry)
 
     def delete_one(self, id: UUID) -> Organization:
         with self.db.get_db_session() as session:
@@ -132,8 +100,3 @@ class OrganizationService:
             ret_value = Organization(**entity.to_dict())
             session.commit()
             return ret_value
-
-            # TODO GB: Enable this check
-            # if any(client.deleted_at is None for client in organization.clients):
-            #    logger.warning("Cannot delete organization with active clients organization_id=%s", id)
-            #    raise OrganizationHasClientsError()

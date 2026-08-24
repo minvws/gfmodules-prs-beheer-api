@@ -6,14 +6,13 @@ from fastapi import HTTPException
 
 from app.db.db import Database
 from app.db.models.client import ClientEntity
-from app.db.models.client_request_personal_id_type import ClientRequestPersonalIdTypeEntity
 from app.db.models.organization import OrganizationEntity
-from app.db.models.organization_request_personal_id_type import OrganizationRequestPersonalIdTypeEntity
+from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
+from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
 from app.db.session import DbSession
-from app.models.client import Client, ClientCreate, ClientUpdate, ClientResolveRequest
-from app.models.oin import Oin
+from app.models.client import Client, ClientFields, ClientQueryParams, ResolveRequest, ResolveResponse
 
 logger = logging.getLogger(__name__)
 
@@ -37,114 +36,104 @@ class ClientService:
     def create_one(
         self,
         organization_id: UUID,
-        input: ClientCreate,
+        input: ClientFields,
     ) -> Client:
         with self.db.get_db_session() as session:
             organization = self._get_organization_or_404(session, organization_id)
 
-            request_by_pid = {item.personal_id_type: item for item in organization.request_personal_id_types}
+            request_by_pid = {item.name: item for item in organization.request_personal_id_types}
             not_in_organization = [pid for pid in input.request_personal_id_types if pid not in request_by_pid]
             if not_in_organization:
                 raise HTTPException(
                     status_code=404,
                     detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
                 )
+            cert_repo = session.get_repository(CertificateRepository)
+            certificates = cert_repo.get_many(organization_id, input.certificates)
 
-            repo: ClientRepository = session.get_repository(ClientRepository)
+            repo = session.get_repository(ClientRepository)
             entity = ClientEntity(
                 organization_id=organization_id,
-                external_id=input.external_id,
-                common_name=input.common_name,
                 request_personal_id_types=[
-                    ClientRequestPersonalIdTypeEntity(
-                        organization_request_personal_id_type=request_by_pid[personal_id_type],
+                    OrganizationPersonalIdTypeEntity(
+                        personal_id_type_id=request_by_pid[personal_id_type].id,
+                        organization_id=organization.id,
                     )
                     for personal_id_type in input.request_personal_id_types
                 ],
+                certificates=list(certificates),
             )
             entity = repo.add_one(entity)
             session.commit()
             return Client(**entity.to_dict())
 
-    def get_one(self, id: UUID, organization_id: UUID) -> Client | None:
+    def get_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
             entity = repo.get_one(organization_id, id)
-            return Client(**entity.to_dict()) if entity else None
+            if not entity:
+                raise HTTPException(status_code=404, detail="Client not found")
+            return Client(**entity.to_dict())
 
-    def get_many(
-        self,
-        organization_id: UUID,
-        external_id: Oin | None = None,
-        common_name: str | None = None,
-        include_deleted: bool = False,
-    ) -> list[Client]:
+    def get_many(self, organization_id: UUID, client_query_params: ClientQueryParams) -> list[Client]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
             entities = repo.get_many(
                 organization_id=organization_id,
-                external_id=external_id,
-                common_name=common_name,
-                include_deleted=include_deleted,
+                include_deleted=client_query_params.include_deleted,
             )
 
             return [Client(**entity.to_dict()) for entity in entities]
 
-    def update_one(self, id: UUID, organization_id, update: ClientUpdate) -> Client:
+    def update_one(self, id: UUID, organization_id: UUID, update: ClientFields) -> Client:
         with self.db.get_db_session() as session:
             organization = self._get_organization_or_404(session, organization_id)
+            organization_pids = [pide.name for pide in organization.request_personal_id_types]
 
-            request_by_pid = {item.personal_id_type: item for item in organization.request_personal_id_types}
-            not_in_organization = [pid for pid in update.request_personal_id_types if pid not in request_by_pid]
+            not_in_organization = [pid for pid in update.request_personal_id_types if pid not in organization_pids]
             if not_in_organization:
                 raise HTTPException(
                     status_code=404,
                     detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
                 )
 
+            cert_repo = session.get_repository(CertificateRepository)
+            certificates = list(cert_repo.get_many(organization_id, update.certificates))
             repo = session.get_repository(ClientRepository)
-            client_entity: ClientEntity = repo.get_one(organization_id, id)
+            client_entity = repo.get_one(organization_id, id)
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
                 raise HTTPException(status_code=404)
             client_entity.updated_at = datetime.now(tz=timezone.utc)
-            client_entity.external_id = update.external_id
-            client_entity.common_name = update.common_name
-            ClientService.update_request_personal_id_types(client_entity, update, request_by_pid)
+            client_entity.certificates = certificates
+            ClientService.update_request_personal_id_types(client_entity, update, organization)
             session.commit()
             return Client(**client_entity.to_dict())
 
     @staticmethod
     def update_request_personal_id_types(
         client_entity: ClientEntity,
-        client_update: ClientUpdate,
-        request_by_pid: dict[str, OrganizationRequestPersonalIdTypeEntity],
-    ):
-        current = {
-            _type.organization_request_personal_id_type.personal_id_type
-            for _type in client_entity.request_personal_id_types
-        }
+        client_update: ClientFields,
+        organization: OrganizationEntity,
+    ) -> None:
+        current = {_type.personal_id_type.name for _type in client_entity.request_personal_id_types}
         updated = set(client_update.request_personal_id_types)
 
         to_add = updated - current
-        to_remove = [
-            e
-            for e in client_entity.request_personal_id_types
-            if e.organization_request_personal_id_type.personal_id_type not in updated
-        ]
+        to_remove = [e for e in client_entity.request_personal_id_types if e.personal_id_type.name not in updated]
 
-        for entry in to_add:
+        for entry_to_add in to_add:
             client_entity.request_personal_id_types.append(
-                ClientRequestPersonalIdTypeEntity(organization_request_personal_id_type=request_by_pid[entry])
+                OrganizationPersonalIdTypeEntity(organization_id=organization.id, personal_id_type=entry_to_add)
             )
 
-        for entry in to_remove:
-            client_entity.request_personal_id_types.remove(entry)
+        for entry_to_remove in to_remove:
+            client_entity.request_personal_id_types.remove(entry_to_remove)
 
     def delete_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
             repo = session.get_repository(ClientRepository)
-            client_entity: ClientEntity = repo.get_one(organization_id, id)
+            client_entity = repo.get_one(organization_id, id)
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
                 raise HTTPException(status_code=404)
@@ -152,7 +141,22 @@ class ClientService:
             session.commit()
             return Client(**client_entity.to_dict())
 
-    def resolve(self, client_resolve_request: ClientResolveRequest) -> ClientEntity | None:
+    def resolve(self, resolve_request: ResolveRequest) -> ResolveResponse:
+        # TODO GB: deprecate support, but stay backwards compatible
         with self.db.get_db_session() as session:
-            repo = session.get_repository(ClientRepository)
-            return repo.get_by_credentials(common_name=common_name, oin=oin, register_id=register_id)
+            client_repo = session.get_repository(ClientRepository)
+            entities = client_repo.get_many(
+                client_id=resolve_request.client_id,
+                certificate_domain=resolve_request.certificate_domain,
+                certificate_organization_identifier=resolve_request.certificate_organization_identifier,
+            )
+            if resolve_request.client_id is not None and len(entities) > 1:
+                logger.error("It should not be possible to have multiple clients for a single client id")
+                raise HTTPException(status_code=500, detail="Internal Server Error")
+            if not entities:
+                raise HTTPException(status_code=404, detail="Client authorization does not exist for given parameters")
+            entity = entities[0]
+            return ResolveResponse(
+                organization_name=entity.organization.external_id.value,
+                scopes=["prs:" + str(rpit) for rpit in entity.request_personal_id_types],
+            )

@@ -1,29 +1,19 @@
 import logging
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends
 
 from app.container import get_client_service
-from app.models.client import ClientResolveRequest, ClientResolveResponse
+from app.models.client import ResolveRequest, ResolveResponse
 from app.services.client import ClientService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/clients", tags=["Clients"])
 
 
-@router.post("/resolve", response_model=ClientResolveResponse, response_model_exclude_none=True, status_code=200)
+@router.post("/resolve", response_model=ResolveResponse, response_model_exclude_none=True, status_code=200)
 def resolve(
-    client_resolve_request: Annotated[ClientResolveRequest, Body()],
+    client_resolve_request: Annotated[ResolveRequest, Body()],
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Any:
-    client = service.resolve(client_resolve_request)
-    if client is None or client.scopes is None:
-        logger.warning(
-            "Client not found or has no granted scopes: client_oin=%s common_name=%s org_id=%s",
-            data.client_organization_id,
-            data.client_common_name,
-            data.organization_id,
-        )
-        raise HTTPException(status_code=404, detail="Client not found.")
-
-    return client
+    return service.resolve(client_resolve_request)

@@ -1,10 +1,10 @@
-from app.services.certificate import CertificateService
 import logging
 
 import inject
 
 from app.config import Config, get_config
 from app.db.db import Database
+from app.services.certificate import CertificateService
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 

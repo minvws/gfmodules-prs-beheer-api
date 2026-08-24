@@ -1,7 +1,7 @@
+from fastapi import Request
 from fastapi.responses import JSONResponse
+from psycopg.errors import ForeignKeyViolation, UniqueViolation
 from sqlalchemy.exc import IntegrityError
-from psycopg.errors import ForeignKeyViolation
-from fastapi import HTTPException, Request
 
 
 async def translate_integrity_error_handler(
@@ -15,4 +15,7 @@ async def translate_integrity_error_handler(
         and exc.orig.diag.constraint_name.endswith("_organization_id_fkey")
     ):
         return JSONResponse(status_code=404, content="Organization not found")
-    return JSONResponse(status_code=500, content="Internal Server Error")
+    if isinstance(exc.orig, UniqueViolation) and exc.orig.diag and exc.orig.diag.constraint_name:
+        return JSONResponse(status_code=409, content="Duplicate entity")
+
+    return JSONResponse(status_code=500, content="Internal Server ErrorRRRRRR!!!")

@@ -2,13 +2,11 @@ import logging
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Query
 
-from app.container import get_client_service, get_organization_service
-from app.logging.events import Log
-from app.models.client import Client, ClientQueryParams, ClientFields
+from app.container import get_client_service
+from app.models.client import Client, ClientFields, ClientQueryParams
 from app.services.client import ClientService
-from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations/{organization_id}/clients", tags=["Clients"])
@@ -25,25 +23,10 @@ def register(
     data: Annotated[ClientFields, Body()],
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Client:
-    logger.debug(
-        "Creating client with organization_id=%s external_id=%s common_name=%s",
-        organization_id,
-        data.external_id,
-        data.common_name,
-    )
-    result = service.create_one(
+    return service.create_one(
         organization_id,
         data,
     )
-    Log.event(
-        logger,
-        Log.CLIENT_REGISTERED,
-        "client registered for organization",
-        organisatie_oin=organization_id,
-        client_external_id=str(data.external_id),
-        common_name=data.common_name,
-    )
-    return result
 
 
 @router.get(
@@ -56,12 +39,7 @@ def get_by_id(
     id: UUID,
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Client:
-    logger.debug("Fetching client organization_id=%s client_id=%s", organization_id, id)
-    result = service.get_one(id, organization_id)
-    if result is None:
-        logger.debug("Client not found organization_id=%s client_id=%s", organization_id, id)
-        raise HTTPException(status_code=404)
-    return result
+    return service.get_one(id, organization_id)
 
 
 @router.get(
@@ -74,14 +52,7 @@ def get_many(
     params: Annotated[ClientQueryParams, Query()],
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> list[Client]:
-    logger.debug(
-        "Listing clients organization_id=%s external_id=%s common_name=%s include_deleted=%s",
-        organization_id,
-        params.external_id,
-        params.common_name,
-        params.include_deleted,
-    )
-    return service.get_many(organization_id=organization_id, **params.model_dump())
+    return service.get_many(organization_id=organization_id, client_query_params=params)
 
 
 @router.put(
@@ -94,15 +65,7 @@ def update(
     id: UUID,
     body: ClientFields,
     service: Annotated[ClientService, Depends(get_client_service)],
-    organization_service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Client:
-    fields = body.model_dump(exclude_unset=True)
-    logger.debug(
-        "Updating client organization_id=%s client_id=%s fields=%s",
-        organization_id,
-        id,
-        list(fields.keys()),
-    )
     return service.update_one(id, organization_id, body)
 
 
@@ -115,13 +78,4 @@ def delete(
     id: UUID,
     service: Annotated[ClientService, Depends(get_client_service)],
 ) -> Client:
-    logger.debug("Deleting client organization_id=%s client_id=%s", organization_id, id)
-    result = service.delete_one(id, organization_id)
-    Log.event(
-        logger,
-        Log.CLIENT_WITHDRAWN,
-        "client access withdrawn",
-        organisatie_id=organization_id,
-        client_external_id=str(result.external_id),
-    )
-    return result
+    return service.delete_one(id, organization_id)

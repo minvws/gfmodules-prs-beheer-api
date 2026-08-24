@@ -1,9 +1,10 @@
-from typing import Any
-from app.models.oin import Oin
-from app.db.models.base import AdminBase, WithTimestamps
-from sqlalchemy.orm import mapped_column, Mapped
-from sqlalchemy import UUID, String, ForeignKey
 import uuid
+from typing import Any
+
+from sqlalchemy import UUID, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.db.models.base import AdminBase, WithTimestamps
 
 
 class CertificateEntity(AdminBase, WithTimestamps):

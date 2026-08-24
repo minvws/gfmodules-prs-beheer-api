@@ -1,11 +1,13 @@
-from fastapi.params import Query
-from app.container import get_certificate_service
-from app.services.certificate import CertificateService
+import logging
 from typing import Annotated
 from uuid import UUID
-from app.models.certificate import Certificate, CertificateQueryParams, CertificateFields
-from fastapi import APIRouter, Depends, Body
-import logging
+
+from fastapi import APIRouter, Body, Depends
+from fastapi.params import Query
+
+from app.container import get_certificate_service
+from app.models.certificate import Certificate, CertificateFields, CertificateQueryParams
+from app.services.certificate import CertificateService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations/{organization_id}/certificates", tags=["Certificates"])

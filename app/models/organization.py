@@ -7,7 +7,7 @@ from app.enums.personal_id_type import PersonalIdType
 from app.models.base import INCLUDE_DELETED_DESCRIPTION
 from app.models.oin import Oin
 
-REGISTER_ID_DESCRIPTION = "The OIN of the organization"
+EXTERNAL_ID_DESCRIPTION = "The OIN of the organization"
 NAME_DESCRIPTION = "The name of the organization"
 SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
 
@@ -27,10 +27,10 @@ class OrganizationReadFields(BaseModel):
 
 class OrganizationFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    external_id: Oin = Field(..., description=REGISTER_ID_DESCRIPTION)
-    name: str = Field(..., description=NAME_DESCRIPTION, example="OrganizationName")
-    receive_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
-    request_personal_id_types: list[PersonalIdType] = Field(example=[PersonalIdType.OPRF])
+    external_id: Oin = Field(..., description=EXTERNAL_ID_DESCRIPTION)
+    name: str = Field(..., description=NAME_DESCRIPTION, examples=["OrganizationName"])
+    receive_personal_id_types: list[PersonalIdType] = Field(examples=[[PersonalIdType.OPRF]])
+    request_personal_id_types: list[PersonalIdType] = Field(examples=[[PersonalIdType.OPRF]])
 
 
 class OrganizationCreate(OrganizationFields):
@@ -38,11 +38,11 @@ class OrganizationCreate(OrganizationFields):
 
 
 class OrganizationUpdate(OrganizationFields):
-    deleted: bool = Field(example=False)
+    deleted: bool = Field(examples=[False])
 
 
 class OrganizationQueryParams(BaseModel):
-    register_id: Oin | None = Field(default=None, description=REGISTER_ID_DESCRIPTION)
+    external_id: Oin | None = Field(default=None, description=EXTERNAL_ID_DESCRIPTION)
     name: str | None = Field(default=None, description=NAME_DESCRIPTION)
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 

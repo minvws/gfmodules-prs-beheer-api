@@ -1,11 +1,13 @@
-from app.db.models.base import Base
-from uuid import UUID
 from datetime import datetime
-import string
-from pydantic import BaseModel, ConfigDict
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.db.models.base import Base
+from app.models.base import INCLUDE_DELETED_DESCRIPTION
 
 
-class CertificateReadFields(BaseModel):
+class CertificateReadFields(Base):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -23,7 +25,7 @@ class CertificateFields(BaseModel):
 
 
 class CertificateQueryParams(BaseModel):
-    pass
+    include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
 class Certificate(CertificateFields, CertificateReadFields):

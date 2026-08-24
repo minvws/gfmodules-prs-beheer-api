@@ -1,67 +1,45 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import UUID, DateTime, ForeignKey, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import UUID, ForeignKey
+from sqlalchemy.orm import Mapped, Relationship, mapped_column, relationship
 
-from app.db.models.base import AdminBase
-from app.db.types.oin_type import OinType
-from app.models.oin import Oin
+from app.db.models.base import (
+    AdminBase,
+    WithTimestamps,
+    WithUUID,
+    client_certificates,
+)
 
 if TYPE_CHECKING:
-    from app.db.models.client_request_personal_id_type import ClientRequestPersonalIdTypeEntity
+    from app.db.models.certificate import CertificateEntity
+    from app.db.models.organization import OrganizationEntity
+    from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
 
 
-class ClientEntity(AdminBase):
+class ClientEntity(AdminBase, WithUUID, WithTimestamps):
     __tablename__ = "clients"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True),
-        primary_key=True,
-        default=uuid.uuid4,
-    )
-
-    # This is currently pinned to the OIN TYPE. But it's likely that in the future we also
-    # need to support additional external_id types.
-    external_id: Mapped[Oin] = mapped_column(OinType())
 
     # TODO GB: What use in linking the organization
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
 
-    common_name: Mapped[str] = mapped_column(String)
+    organization: Mapped[OrganizationEntity] = Relationship(back_populates="clients")
 
-    request_personal_id_types: Mapped[list[ClientRequestPersonalIdTypeEntity]] = relationship(
-        "ClientRequestPersonalIdTypeEntity", cascade="all, delete-orphan"
-    )
+    certificates: Mapped[list[CertificateEntity]] = Relationship(secondary=client_certificates)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.now(tz=timezone.utc),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=datetime.now(tz=timezone.utc),
-    )
-    deleted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
+    # request_personal_id_types: Mapped[list[PersonalIdTypeEntity]] = Relationship(
+    #    "PersonalIdTypeEntity",
+    #    secondary=client_request_personal_id_types,
+    # )
+    request_personal_id_types: Mapped[list[OrganizationPersonalIdTypeEntity]] = relationship()
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "id": str(self.id),
-            "external_id": str(self.external_id),
-            "common_name": self.common_name,
+            **WithUUID.to_dict(self),
+            **WithTimestamps.to_dict(self),
             "organization_id": self.organization_id,
-            "request_personal_id_types": [
-                ra.organization_request_personal_id_type.personal_id_type for ra in self.request_personal_id_types
-            ],
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
-            "deleted_at": self.deleted_at,
+            "certificates": [c.id for c in self.certificates],
+            "request_personal_id_types": [ra.personal_id_type.name for ra in self.request_personal_id_types],
         }

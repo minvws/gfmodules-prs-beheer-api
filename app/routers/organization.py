@@ -3,7 +3,6 @@ from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy.exc import IntegrityError
 
 from app.container import get_organization_service
 from app.logging.events import Log
@@ -13,7 +12,6 @@ from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
-_register_id_conflict_message = "There is an active organization with the same register_id."
 
 
 @router.post("", response_model=Organization, response_model_exclude_none=True, status_code=201)
@@ -21,19 +19,7 @@ def register(
     data: Annotated[OrganizationCreate, Body()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Organization:
-    logger.debug("Creating organization with id=%s", data.external_id)
-    try:
-        result = service.create_one(data)
-    except IntegrityError:
-        logger.warning("Organization create conflict for register_id=%s", data.external_id)
-        raise HTTPException(status_code=409, detail=_register_id_conflict_message)
-    Log.event(
-        logger,
-        Log.ORGANIZATION_REGISTERED,
-        "organization registered",
-        organisatie_oin=str(data.external_id),
-    )
-    return result
+    return service.create_one(data)
 
 
 @router.get("/{id}", response_model=Organization, response_model_exclude_none=True)
@@ -57,7 +43,7 @@ def get_many(
     # TODO GB: Include deleted
     logger.debug(
         "Listing organizations register_id=%s name=%s include_deleted=%s",
-        params.register_id,
+        params.external_id,
         params.name,
         params.include_deleted,
     )
