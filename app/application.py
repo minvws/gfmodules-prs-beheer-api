@@ -13,7 +13,7 @@ from app import container
 from app.config import get_config
 from app.logging.config_builder import LogConfigBuilder
 from app.logging.events import Log
-from app.logging.middleware import RequestContextMiddleware, bind_request_context
+from app.logging.middleware import RequestContextMiddleware, restore_request_context
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.default import router as default_router
@@ -50,19 +50,14 @@ async def request_validation_exception_handler(
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
 
+@restore_request_context
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    # This handler runs in ServerErrorMiddleware, outside RequestContextMiddleware, so the
-    # per-request context has already been torn down; rebind it to log and answer with it.
-    with bind_request_context(request) as context:
-        logger.error(
-            "Unhandled exception",
-            exc_info=exc,
-            extra={"exception_type": type(exc).__name__},
-        )
-        response = JSONResponse(status_code=500, content={"error": "Internal server error"})
-        if context is not None:
-            context.apply_to(response)
-        return response
+    logger.error(
+        "Unhandled exception",
+        exc_info=exc,
+        extra={"exception_type": type(exc).__name__},
+    )
+    return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 def get_uvicorn_params() -> dict[str, Any]:
