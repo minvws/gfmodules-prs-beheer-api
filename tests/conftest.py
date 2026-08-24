@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from app.application import request_validation_exception_handler
 from app.config import ConfigDatabase
@@ -15,9 +16,14 @@ from app.container import get_client_service, get_organization_service
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
+from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
+from app.db.models.personal_id_type import PersonalIdTypeEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.session import DbSession
+from app.enums.personal_id_type import PersonalIdType
 from app.models.oin import Oin
+from app.models.organization import Organization, OrganizationCreate
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
@@ -25,7 +31,7 @@ from app.services.client import ClientService
 from app.services.organization import OrganizationService
 
 TEST_OIN = Oin("00000099000000001000")
-TEST_REGISTER_ID = Oin("00000099000000009000")
+TEST_EXTERNAL_ID = Oin("00000099000000009000")
 TEST_ORG_NAME = "Test Organization"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
@@ -34,21 +40,32 @@ FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 @pytest.fixture()
 def database() -> Generator[Database, Any, None]:
-    config_database = ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[])
+    config_database = ConfigDatabase(dsn="sqlite://", retry_backoff=[])
     db = Database(config_database=config_database)
+    with db.get_db_session(commit=True) as session:
+        session.session.execute(text("ATTACH DATABASE ':memory:' as admin"))
     db.generate_tables()
     yield db
     db.engine.dispose()
 
 
 @pytest.fixture()
-def organization_repository(database: Database) -> OrganizationRepository:
-    return OrganizationRepository(db_session=database.get_db_session())
+def db_session(database: Database) -> Generator[DbSession, Any, None]:
+    print("SESSION START")
+    with database.get_db_session() as session:
+        yield session
+    print("SESSION STOP")
 
 
 @pytest.fixture()
-def client_repository(database: Database) -> ClientRepository:
-    return ClientRepository(db_session=database.get_db_session())
+def organization_repository(db_session: DbSession) -> OrganizationRepository:
+    print("GET_ORG_REPO")
+    return OrganizationRepository(db_session=db_session)
+
+
+@pytest.fixture()
+def client_repository(db_session: DbSession) -> ClientRepository:
+    return ClientRepository(db_session=db_session)
 
 
 @pytest.fixture()
@@ -59,28 +76,56 @@ def organization_service(database: Database) -> OrganizationService:
 @pytest.fixture()
 def client_service(
     database: Database,
-    organization_service: OrganizationService,
 ) -> ClientService:
-    return ClientService(database, organization_service)
+    return ClientService(database)
 
 
 @pytest.fixture()
 def organization_entity() -> OrganizationEntity:
-    return OrganizationEntity(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
+    return OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
 
 
 @pytest.fixture()
-def persisted_organization(organization_service: OrganizationService) -> OrganizationEntity:
-    return organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
+def persisted_personal_id_type_entity(db_session) -> PersonalIdTypeEntity:
+    pite = PersonalIdTypeEntity(name="OPRF")
+    db_session.add(pite)
+    db_session.commit()
+    return pite
 
 
 @pytest.fixture()
 def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
     return ClientEntity(
         organization_id=persisted_organization.id,
-        oin=TEST_OIN,
-        common_name=TEST_COMMON_NAME,
+        request_personal_id_types=[
+            OrganizationPersonalIdTypeEntity(
+                organization_id=persisted_organization.id,
+                personal_id_type_id=persisted_organization.receive_personal_id_types[0].id,
+            )
+        ],
     )
+
+
+@pytest.fixture()
+def persisted_client_entity(db_session, client_entity: ClientEntity) -> ClientEntity:
+    db_session.add(client_entity)
+    db_session.commit()
+    return client_entity
+
+
+@pytest.fixture()
+def persisted_organization(
+    db_session: DbSession, persisted_personal_id_type_entity: PersonalIdTypeEntity
+) -> OrganizationEntity:
+    org = OrganizationEntity(
+        external_id=TEST_EXTERNAL_ID,
+        name=TEST_ORG_NAME,
+        receive_personal_id_types=[persisted_personal_id_type_entity],
+        request_personal_id_types=[persisted_personal_id_type_entity],
+    )
+    db_session.add(org)
+    db_session.commit()
+    return org
 
 
 @pytest.fixture()

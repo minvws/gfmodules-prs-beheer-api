@@ -22,17 +22,12 @@ if TYPE_CHECKING:
 class ClientEntity(AdminBase, WithUUID, WithTimestamps):
     __tablename__ = "clients"
 
-    # TODO GB: What use in linking the organization
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
 
     organization: Mapped[OrganizationEntity] = Relationship(back_populates="clients")
 
     certificates: Mapped[list[CertificateEntity]] = Relationship(secondary=client_certificates)
 
-    # request_personal_id_types: Mapped[list[PersonalIdTypeEntity]] = Relationship(
-    #    "PersonalIdTypeEntity",
-    #    secondary=client_request_personal_id_types,
-    # )
     request_personal_id_types: Mapped[list[OrganizationPersonalIdTypeEntity]] = relationship()
 
     def to_dict(self) -> dict[str, Any]:

@@ -65,6 +65,7 @@ class DbSession:
         Create a new session when entering the context manager
         """
         self.session = Session(self._engine, expire_on_commit=False)
+        print("ENTER!!!!!!")
         return self
 
     def __exit__(
@@ -76,6 +77,7 @@ class DbSession:
         """
         Close the session when exiting the context manager
         """
+        print("EXIT!!!!!!")
         if exc_type is None and exc_val is None and self._commit:
             self.session.commit()
         self.session.close()

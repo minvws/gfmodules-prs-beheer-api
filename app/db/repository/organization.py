@@ -12,13 +12,8 @@ from app.models.oin import Oin
 
 class OrganizationRepository(RepositoryBase):
     def add_one(self, data: OrganizationEntity) -> OrganizationEntity:
-        try:
-            self.db_session.add(data)
-            self.db_session.commit()
-            return data
-        except SQLAlchemyError:
-            self.db_session.rollback()
-            raise
+        self.db_session.add(data)
+        return data
 
     def get_one(self, id: UUID) -> OrganizationEntity | None:
         stmt = select(OrganizationEntity).where(OrganizationEntity.id == id)
@@ -29,10 +24,6 @@ class OrganizationRepository(RepositoryBase):
         is ``lazy="raise"``). Includes soft-deleted clients; filter on ``deleted_at``."""
         stmt = select(OrganizationEntity).options(selectinload(OrganizationEntity.clients)).where(self._and_clause(id))
         return self.db_session.session.execute(stmt).scalar()
-
-    def exists(self, id: UUID) -> bool:
-        stmt = select(select(OrganizationEntity.id).where(self._and_clause(id)).exists())
-        return bool(self.db_session.session.execute(stmt).scalar())
 
     def get_many(
         self,
