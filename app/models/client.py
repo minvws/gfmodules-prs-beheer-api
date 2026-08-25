@@ -1,10 +1,9 @@
-from datetime import datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.enums.personal_id_type import PersonalIdType
-from app.models.base import INCLUDE_DELETED_DESCRIPTION, Base
+from app.models.base import INCLUDE_DELETED_DESCRIPTION, BaseReadFields
 from app.models.oin import Oin
 
 DOMAIN_DESCRIPTION = "The domain of the client certificate registered in the CN or the SAN"
@@ -12,14 +11,6 @@ ORGANIZATION_IDENTIFIER_DESCRIPTION = "The organization_identifier of the client
 EXTERNAL_ID_DESCRIPTION = "The external_id of the Client. Currently limited and transformed to OIN"
 CLIENT_ID_DESCRIPTION = "The assigned id of the Cient."
 ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on behalf of"
-
-
-class ClientReadFields(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
-    deleted_at: datetime | None = None
 
 
 class ClientFields(BaseModel):
@@ -40,7 +31,7 @@ class ClientQueryParams(BaseModel):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Client(Base, ClientReadFields, ClientFields):
+class Client(BaseReadFields, ClientFields):
     organization_id: UUID
 
 

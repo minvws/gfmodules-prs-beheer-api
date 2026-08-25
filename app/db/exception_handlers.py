@@ -20,7 +20,7 @@ async def translate_integrity_error_handler(
         and exc.orig.diag
         and exc.orig.diag.constraint_name == "client_request_personal_id_ty_organization_id_personal_id__fkey"
     ):
-        return JSONResponse(status_code=404, content="Removed personal id type still in use by clients")
+        return JSONResponse(status_code=400, content="Removed personal id type still in use by clients")
     if isinstance(exc.orig, UniqueViolation) and exc.orig.diag and exc.orig.diag.constraint_name:
         return JSONResponse(status_code=409, content="Duplicate entity")
     return JSONResponse(status_code=500, content="Internal Server Error")

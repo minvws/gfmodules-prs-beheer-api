@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from app.application import request_validation_exception_handler
 from app.config import ConfigDatabase

@@ -1,10 +1,7 @@
-from datetime import datetime
-from uuid import UUID
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.enums.personal_id_type import PersonalIdType
-from app.models.base import INCLUDE_DELETED_DESCRIPTION
+from app.models.base import INCLUDE_DELETED_DESCRIPTION, BaseReadFields
 from app.models.oin import Oin
 
 EXTERNAL_ID_DESCRIPTION = "The OIN of the organization"
@@ -15,14 +12,6 @@ SCOPES_DESCRIPTION = "The space separated scopes granted to the organization"
 class OrganizationRequestAuthorizationCreate(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     authorization: str
-
-
-class OrganizationReadFields(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
-    deleted_at: datetime | None = None
 
 
 class OrganizationFields(BaseModel):
@@ -47,5 +36,5 @@ class OrganizationQueryParams(BaseModel):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
-class Organization(OrganizationReadFields, OrganizationCreate):
+class Organization(OrganizationCreate, BaseReadFields):
     pass
