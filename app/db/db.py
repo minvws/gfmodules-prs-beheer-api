@@ -5,7 +5,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import ConfigDatabase
-from app.db.models.base import AdminBase, PrsBase
+from app.db.models.base import Base
 from app.db.session import DbSession
 
 logger = logging.getLogger(__name__)
@@ -41,8 +41,7 @@ class Database:
 
     def generate_tables(self) -> None:
         logger.info("Generating tables...")
-        AdminBase.metadata.create_all(self.engine)
-        PrsBase.metadata.create_all(self.engine)
+        Base.metadata.create_all(self.engine)
 
     def is_healthy(self) -> bool:
         """

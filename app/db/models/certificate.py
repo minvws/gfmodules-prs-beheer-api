@@ -4,11 +4,12 @@ from typing import Any
 from sqlalchemy import UUID, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.models.base import AdminBase, WithTimestamps
+from app.db.models.base import Base, WithTimestamps
 
 
-class CertificateEntity(AdminBase, WithTimestamps):
+class CertificateEntity(Base, WithTimestamps):
     __tablename__ = "certificates"
+    __table_args__ = ({"schema": "admin"},)
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),

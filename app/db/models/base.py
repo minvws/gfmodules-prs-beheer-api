@@ -13,21 +13,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-admin_metadata_obj = MetaData(schema="admin")
 
-prs_metadata_obj = MetaData(schema="prs")
-
-
-class Base:
+class Base(DeclarativeBase):
     pass
-
-
-class AdminBase(Base, DeclarativeBase):
-    metadata = admin_metadata_obj
-
-
-class PrsBase(Base, DeclarativeBase):
-    metadata = prs_metadata_obj
 
 
 class WithUUID:
@@ -67,25 +55,31 @@ class WithTimestamps:
         }
 
 
+admin_metadata_obj = MetaData(schema="admin")
+
 client_certificates = Table(
     "client_certificates",
-    admin_metadata_obj,
+    Base.metadata,
     Column("client_id", UUID, ForeignKey("admin.clients.id"), primary_key=True),
     Column("certificate_id", UUID, ForeignKey("admin.certificates.id"), primary_key=True),
+    schema="admin",
 )
 
 organization_receive_personal_id_types = Table(
     "organization_receive_personal_id_types",
-    admin_metadata_obj,
+    Base.metadata,
     Column("organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True),
     Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
+    schema="admin",
 )
 
 organization_request_personal_id_types = Table(
     "organization_request_personal_id_types",
+    Base.metadata,
     admin_metadata_obj,
     Column("organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True),
     Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
+    schema="admin",
 )
 
 # client_request_personal_id_types = Table(

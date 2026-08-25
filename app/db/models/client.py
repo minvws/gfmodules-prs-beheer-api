@@ -7,7 +7,7 @@ from sqlalchemy import UUID, ForeignKey
 from sqlalchemy.orm import Mapped, Relationship, mapped_column, relationship
 
 from app.db.models.base import (
-    AdminBase,
+    Base,
     WithTimestamps,
     WithUUID,
     client_certificates,
@@ -19,8 +19,9 @@ if TYPE_CHECKING:
     from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
 
 
-class ClientEntity(AdminBase, WithUUID, WithTimestamps):
+class ClientEntity(Base, WithUUID, WithTimestamps):
     __tablename__ = "clients"
+    __table_args__ = ({"schema": "admin"},)
 
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
 

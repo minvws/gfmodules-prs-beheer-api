@@ -6,7 +6,7 @@ from sqlalchemy import Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.models.base import (
-    AdminBase,
+    Base,
     WithTimestamps,
     WithUUID,
     organization_receive_personal_id_types,
@@ -19,9 +19,10 @@ if TYPE_CHECKING:
     from app.db.models.certificate import CertificateEntity
     from app.db.models.client import ClientEntity
     from app.db.models.personal_id_type import PersonalIdTypeEntity
+    from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 
 
-class OrganizationEntity(AdminBase, WithUUID, WithTimestamps):
+class OrganizationEntity(Base, WithUUID, WithTimestamps):
     __tablename__ = "organizations"
     __table_args__ = (
         Index(
@@ -31,6 +32,7 @@ class OrganizationEntity(AdminBase, WithUUID, WithTimestamps):
             sqlite_where=text("deleted_at IS NULL"),
             postgresql_where=text("deleted_at IS NULL"),
         ),
+        {"schema": "admin"},
     )
 
     # This is currently pinned to the OIN TYPE. But it's likely that in the future we also
@@ -49,6 +51,8 @@ class OrganizationEntity(AdminBase, WithUUID, WithTimestamps):
     request_personal_id_types: Mapped[list[PersonalIdTypeEntity]] = relationship(
         secondary=organization_request_personal_id_types
     )
+
+    hsm_key_versions: Mapped[list[HsmKeyVersionEntity]] = relationship(back_populates="organization")
 
     def to_dict(self) -> dict[str, Any]:
         return {

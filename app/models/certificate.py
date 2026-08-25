@@ -3,11 +3,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.db.models.base import Base
 from app.models.base import INCLUDE_DELETED_DESCRIPTION
 
 
-class CertificateReadFields(Base):
+class CertificateReadFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID

@@ -29,6 +29,7 @@ def retrying_database() -> Database:
     database = Database(config_database=ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[0.01, 0.01]))
     with database.get_db_session(commit=True) as session:
         session.session.execute(text("ATTACH DATABASE ':memory:' as admin"))
+        session.session.execute(text("ATTACH DATABASE ':memory:' as prs"))
     database.generate_tables()
     return database
 
@@ -71,6 +72,7 @@ def test_reads_are_still_retried_after_a_rollback() -> None:
     database = Database(config_database=ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[0.01]))
     with database.get_db_session(commit=True) as session:
         session.session.execute(text("ATTACH DATABASE ':memory:' as admin"))
+        session.session.execute(text("ATTACH DATABASE ':memory:' as prs"))
     database.generate_tables()
 
     with database.get_db_session() as session:

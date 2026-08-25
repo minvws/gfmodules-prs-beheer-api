@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import HTTPException
 
 from app.db.db import Database
+from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.personal_id_type import PersonalIdTypeRepository
@@ -38,6 +39,12 @@ class OrganizationService:
                     name=input.name,
                     receive_personal_id_types=receive_personal_id_types,
                     request_personal_id_types=request_personal_id_types,
+                    hsm_key_versions=[
+                        HsmKeyVersionEntity(
+                            version=0,
+                            from_dt=datetime.now(timezone.utc),
+                        ),
+                    ],
                 )
             )
             session.flush()

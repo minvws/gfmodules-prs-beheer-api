@@ -45,13 +45,11 @@ class Client(Base, ClientReadFields, ClientFields):
 
 
 class DeprecatedResolveRequest(BaseModel):
-    # TODO DEprecated message
     client_organization_id: Oin = Field(description=ORGANIZATION_IDENTIFIER_DESCRIPTION, deprecated=True)
     client_common_name: str = Field(description=DOMAIN_DESCRIPTION, deprecated=True)
     organization_id: Oin = Field(description=EXTERNAL_ID_DESCRIPTION, deprecated=True)
 
 
-# TODO GB Make backwards compatible
 class ResolveRequest(BaseModel):
     client_id: UUID | None = Field(description=CLIENT_ID_DESCRIPTION, default=None)
     organization_external_id: Oin = Field(description=EXTERNAL_ID_DESCRIPTION)

@@ -8,11 +8,11 @@ from sqlalchemy import UUID, DateTime, ForeignKey, ForeignKeyConstraint, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.models import ClientEntity
-from app.db.models.base import AdminBase
+from app.db.models.base import Base
 from app.db.models.personal_id_type import PersonalIdTypeEntity
 
 
-class OrganizationPersonalIdTypeEntity(AdminBase):
+class OrganizationPersonalIdTypeEntity(Base):
     __tablename__ = "client_request_personal_id_types"
     __table_args__: tuple[Any, ...] = (
         ForeignKeyConstraint(
@@ -22,7 +22,7 @@ class OrganizationPersonalIdTypeEntity(AdminBase):
                 "admin.organization_request_personal_id_types.personal_id_type_id",
             ],
         ),
-        {},
+        {"schema": "admin"},
     )
 
     client_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.clients.id"), primary_key=True)

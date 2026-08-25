@@ -52,6 +52,7 @@ def database() -> Generator[Database, Any, None]:
     db = Database(config_database=config_database)
     with db.get_db_session(commit=True) as session:
         session.session.execute(text("ATTACH DATABASE ':memory:' as admin"))
+        session.session.execute(text("ATTACH DATABASE ':memory:' as prs"))
         session.session.execute(text("PRAGMA foreign_keys=ON"))
     db.generate_tables()
     with db.get_db_session(commit=True) as session:

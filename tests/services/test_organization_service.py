@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.db.db import Database
@@ -43,6 +44,11 @@ def test_create_and_update_should_update_name_and_deleted(database: Database) ->
     assert result.name == "Renamed"
     assert result.deleted_at is not None
     assert result.external_id == TEST_OIN_2
+    with database.get_db_session() as session:
+        organization = session.execute(select(OrganizationEntity).where(OrganizationEntity.id == created.id)).scalar()
+        assert organization is not None
+        assert organization.id == created.id
+        assert organization.hsm_key_versions[0].version == 0
 
 
 def test_get_one_should_succeed(
