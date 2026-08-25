@@ -65,7 +65,6 @@ class DbSession:
         Create a new session when entering the context manager
         """
         self.session = Session(self._engine, expire_on_commit=False)
-        print("ENTER!!!!!!")
         return self
 
     def __exit__(
@@ -77,7 +76,6 @@ class DbSession:
         """
         Close the session when exiting the context manager
         """
-        print("EXIT!!!!!!")
         if exc_type is None and exc_val is None and self._commit:
             self.session.commit()
         self.session.close()
@@ -116,6 +114,24 @@ class DbSession:
         :return:
         """
         self._run_once(self.session.commit)
+
+    def flush(self) -> None:
+        """Flush all the object changes to the database.
+
+        Writes out all pending object creations, deletions and modifications
+        to the database as INSERTs, DELETEs, UPDATEs, etc.  Operations are
+        automatically ordered by the Session's unit of work dependency
+        solver.
+
+        Database operations will be issued in the current transactional
+        context and do not affect the state of the transaction, unless an
+        error occurs, in which case the entire transaction is rolled back.
+        You may flush() as often as you like within a transaction to move
+        changes from Python to the database's transaction buffer.
+
+        :return:
+        """
+        self._run_once(self.session.flush)
 
     def rollback(self) -> None:
         """

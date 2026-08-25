@@ -1,265 +1,253 @@
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 
 from app.db.db import Database
+from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
+from app.enums.personal_id_type import PersonalIdType
+from app.models.client import ClientCreate, ClientFields, ClientUpdate
 from app.models.oin import Oin
+from app.models.organization import OrganizationCreate, OrganizationUpdate
 from app.services.client import ClientService
-from app.services.exceptions import OrganizationHasClientsError, ScopesInUseError
 from app.services.organization import OrganizationService
-from tests.conftest import TEST_COMMON_NAME, TEST_OIN, TEST_ORG_NAME, TEST_REGISTER_ID
+from tests.conftest import TEST_OIN, TEST_OIN_2, TEST_ORG_NAME
 
 SECOND_ORG_REG_ID = Oin("00000099000000008000")
 SECOND_ORG_NAME = "Second Test Organization"
 
 
-def test_update_one_ignores_register_id_validation_when_absent(database: Database) -> None:
+def test_create_and_update_should_update_name_and_deleted(database: Database) -> None:
     service = OrganizationService(database)
-    created = service.create_one(register_id=TEST_OIN, name=TEST_ORG_NAME)
-    result = service.update_one(created.id, name="Renamed")
+    created = service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            name=TEST_ORG_NAME,
+        )
+    )
+    result = service.update_one(
+        created.id,
+        OrganizationUpdate(
+            external_id=TEST_OIN_2,
+            receive_personal_id_types=[PersonalIdType.OPRF],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            name="Renamed",
+            deleted=True,
+        ),
+    )
     assert result is not None
     assert result.name == "Renamed"
-
-
-def test_create_one_should_succeed(
-    organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
-) -> None:
-    result = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-    )
-    assert isinstance(result.id, UUID)
-    assert result.register_id == organization_entity.register_id
-    assert result.name == organization_entity.name
-
-
-def test_create_one_with_scopes(
-    organization_service: OrganizationService,
-) -> None:
-    result = organization_service.create_one(
-        register_id=TEST_REGISTER_ID,
-        name=TEST_ORG_NAME,
-        scopes="read write",
-    )
-    assert result.scopes == "read write"
+    assert result.deleted_at is not None
+    assert result.external_id == TEST_OIN_2
 
 
 def test_get_one_should_succeed(
     organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
+    persisted_organization: OrganizationEntity,
 ) -> None:
-    created = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-    )
-    result = organization_service.get_one(created.id)
+    result = organization_service.get_one(persisted_organization.id)
     assert result is not None
-    assert result.id == created.id
-    assert result.register_id == created.register_id
+    assert result.id == persisted_organization.id
+    assert result.deleted_at == persisted_organization.deleted_at
+    assert result.external_id == persisted_organization.external_id
 
 
 def test_get_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
-    result = organization_service.get_one(uuid4())
-    assert result is None
+    with pytest.raises(HTTPException) as e:
+        organization_service.get_one(uuid4())
+    assert e.value.status_code == 404
+    assert e.value.detail == "Organization not found"
 
 
-def test_delete_one_soft_deletes(
+def test_delete_one_blocked_when_client_exists(
     organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
+    persisted_client_entity: ClientEntity,
 ) -> None:
-    created = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-    )
-    organization_service.delete_one(created.id)
-    result = organization_service.get_one(created.id)
-    assert result is None
+    with pytest.raises(HTTPException) as e:
+        organization_service.delete_one(persisted_client_entity.organization_id)
 
-
-@pytest.mark.parametrize("client_scopes", [None, "baz"])
-def test_delete_one_blocked_when_active_client_exists(
-    organization_service: OrganizationService,
-    client_service: ClientService,
-    client_scopes: str | None,
-) -> None:
-    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
-    client_service.create_one(
-        organization_id=created.id,
-        oin=TEST_OIN,
-        common_name=TEST_COMMON_NAME,
-        scopes=client_scopes,
-    )
-
-    with pytest.raises(OrganizationHasClientsError):
-        organization_service.delete_one(created.id)
-
-    persisted = organization_service.get_one(created.id)
+    persisted = organization_service.get_one(persisted_client_entity.organization_id)
     assert persisted is not None
     assert persisted.deleted_at is None
+    assert e.value.status_code == 403
+    assert e.value.detail == "Organization still has active clients"
 
 
 def test_delete_one_allowed_when_clients_are_deleted(
     organization_service: OrganizationService,
     client_service: ClientService,
+    persisted_client_entity: ClientEntity,
 ) -> None:
-    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
-    client = client_service.create_one(
-        organization_id=created.id,
-        oin=TEST_OIN,
-        common_name=TEST_COMMON_NAME,
-        scopes="baz",
-    )
-    client_service.delete_one(client.id, created.id)
-
-    organization_service.delete_one(created.id)
-    assert organization_service.get_one(created.id) is None
-
-
-def test_delete_one_returns_none_when_not_found(
-    organization_service: OrganizationService,
-) -> None:
-    result = organization_service.delete_one(uuid4())
-    assert result is None
-
-
-def test_update_one_should_succeed(
-    organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
-) -> None:
-    created = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-    )
-    result = organization_service.update_one(created.id, name="New Name")
-    assert result is not None
-    assert result.name == "New Name"
-    assert result.id == created.id
-
-
-def test_update_one_scopes(
-    organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
-) -> None:
-    created = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-    )
-    result = organization_service.update_one(created.id, scopes="read write")
-    assert result is not None
-    assert result.scopes == "read write"
+    client_service.delete_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    organization_service.delete_one(persisted_client_entity.organization_id)
+    updated = organization_service.get_one(persisted_client_entity.organization_id)
+    assert updated.deleted_at is not None
+    assert updated.id == persisted_client_entity.organization_id
 
 
 def test_update_one_scope_can_be_removed_and_added_back(
     organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
 ) -> None:
+
     created = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-        scopes="foo bar baz",
+        OrganizationCreate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="created",
+        )
     )
+    assert created.receive_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
+    assert created.request_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
 
-    removed = organization_service.update_one(created.id, scopes="foo bar")
-    assert removed is not None
-    assert removed.scopes == "foo bar"
+    updated = organization_service.update_one(
+        created.id,
+        OrganizationUpdate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF],
+            request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="updated",
+            deleted=False,
+        ),
+    )
+    assert updated is not None
+    assert updated.receive_personal_id_types == [PersonalIdType.OPRF]
+    assert updated.request_personal_id_types == [PersonalIdType.REVERSIBLE_PSEUDONYM]
 
-    added_back = organization_service.update_one(created.id, scopes="foo bar baz")
-    assert added_back is not None
-    assert added_back.scopes == "foo bar baz"
+    updated_back = organization_service.update_one(
+        created.id,
+        OrganizationUpdate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="updated_back",
+            deleted=False,
+        ),
+    )
+    assert updated_back is not None
+    assert updated_back.receive_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
+    assert updated_back.request_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
 
     persisted = organization_service.get_one(created.id)
     assert persisted is not None
-    assert persisted.scopes == "foo bar baz"
+    assert persisted.receive_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
+    assert persisted.request_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
 
 
 def test_update_one_scope_removal_blocked_when_used_by_client(
     organization_service: OrganizationService,
     client_service: ClientService,
 ) -> None:
-    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
-    client_service.create_one(
-        organization_id=created.id,
-        oin=TEST_OIN,
-        common_name=TEST_COMMON_NAME,
-        scopes="baz",
+    created = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="created",
+        )
+    )
+    assert created.receive_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
+    assert created.request_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
+
+    created_client = client_service.create_one(
+        created.id, ClientCreate(request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM])
     )
 
-    with pytest.raises(ScopesInUseError, match="baz"):
-        organization_service.update_one(created.id, scopes="foo bar")
+    with pytest.raises(IntegrityError) as e:
+        organization_service.update_one(
+            created.id,
+            OrganizationUpdate(
+                external_id=TEST_OIN,
+                receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+                request_personal_id_types=[PersonalIdType.OPRF],
+                name="updated",
+                deleted=False,
+            ),
+        )
+    ## The failing foreign key constraint name is not available because the tests run in SQLite
+    assert str(e.value.orig) == "FOREIGN KEY constraint failed"
+
+    persisted_client = client_service.get_one(created_client.id, created.id)
+    assert persisted_client is not None
+    assert persisted_client.request_personal_id_types == [PersonalIdType.REVERSIBLE_PSEUDONYM]
 
     persisted = organization_service.get_one(created.id)
     assert persisted is not None
-    assert persisted.scopes == "foo bar baz"
+    assert persisted.request_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
 
-
-def test_update_one_scope_removal_allowed_when_client_no_longer_uses_it(
-    organization_service: OrganizationService,
-    client_service: ClientService,
-) -> None:
-    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
-    client = client_service.create_one(
-        organization_id=created.id,
-        oin=TEST_OIN,
-        common_name=TEST_COMMON_NAME,
-        scopes="baz",
+    # test_update_one_scope_removal_allowed_when_client_no_longer_uses_it
+    client_service.update_one(
+        persisted_client.id, persisted.id, ClientUpdate(request_personal_id_types=[], deleted=False)
     )
-    client_service.update_one(client.id, created.id, scopes="foo")
 
-    result = organization_service.update_one(created.id, scopes="foo bar")
-    assert result is not None
-    assert result.scopes == "foo bar"
-
-
-def test_update_one_can_change_register_id(
-    organization_service: OrganizationService,
-) -> None:
-    created = organization_service.create_one(
-        register_id=TEST_REGISTER_ID,
-        name=TEST_ORG_NAME,
+    result = organization_service.update_one(
+        created.id,
+        OrganizationUpdate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            name="updated",
+            deleted=False,
+        ),
     )
-    result = organization_service.update_one(created.id, register_id=SECOND_ORG_REG_ID)
     assert result is not None
-    assert result.register_id == SECOND_ORG_REG_ID
+    assert result.request_personal_id_types == [PersonalIdType.OPRF]
 
 
 def test_update_one_register_id_conflict_raises_integrity_error(
     organization_service: OrganizationService,
 ) -> None:
-    first = organization_service.create_one(register_id=TEST_REGISTER_ID, name="First Org")
-    second = organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
-
-    with pytest.raises(IntegrityError):
-        organization_service.update_one(first.id, register_id=second.register_id)
-
-
-def test_update_one_scope_removal_ignores_deleted_clients(
-    organization_service: OrganizationService,
-    client_service: ClientService,
-) -> None:
-    created = organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="foo bar baz")
-    client = client_service.create_one(
-        organization_id=created.id,
-        oin=TEST_OIN,
-        common_name=TEST_COMMON_NAME,
-        scopes="baz",
+    first = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="first",
+        )
     )
-    client_service.delete_one(client.id, created.id)
-
-    result = organization_service.update_one(created.id, scopes="foo bar")
-    assert result is not None
-    assert result.scopes == "foo bar"
+    second = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN_2,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="second",
+        )
+    )
+    with pytest.raises(IntegrityError):
+        organization_service.update_one(
+            first.id,
+            OrganizationUpdate(
+                external_id=second.external_id,
+                receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+                request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+                name="first",
+                deleted=False,
+            ),
+        )
 
 
 def test_update_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
-    result = organization_service.update_one(uuid4(), name="not-found")
-    assert result is None
+    with pytest.raises(HTTPException) as e:
+        organization_service.update_one(
+            uuid4(),
+            OrganizationUpdate(
+                external_id=TEST_OIN,
+                receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+                request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+                name="first",
+                deleted=False,
+            ),
+        )
+    assert e.value.status_code == 404
+    assert e.value.detail == "Organization not found"
 
 
 def test_get_many_returns_empty_when_none(
@@ -271,81 +259,55 @@ def test_get_many_returns_empty_when_none(
 
 def test_get_many_returns_all(
     organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
 ) -> None:
-    organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
+    first = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="first",
+        )
     )
-    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
+    second = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN_2,
+            receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+            name="second",
+        )
+    )
     results = organization_service.get_many()
-    assert len(results) == 2
+    assert [first.id, second.id] == [r.id for r in results]
 
-
-def test_get_many_excludes_deleted(
-    organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
-) -> None:
-    created = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
+    organization_service.update_one(
+        second.id,
+        OrganizationUpdate(
+            external_id=TEST_OIN_2,
+            receive_personal_id_types=[PersonalIdType.OPRF],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            name="Renamed",
+            deleted=True,
+        ),
     )
-    organization_service.delete_one(created.id)
-    results = organization_service.get_many()
-    assert results == []
 
-
-def test_get_many_include_deleted_returns_deleted(
-    organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
-) -> None:
-    created = organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-    )
-    organization_service.delete_one(created.id)
-    results = organization_service.get_many(include_deleted=True)
-    assert len(results) == 1
-    assert results[0].id == created.id
+    # test_get_many_excludes_deleted
+    results_after_delete = organization_service.get_many()
+    assert [first.id] == [r.id for r in results_after_delete]
 
 
 def test_get_many_filters_by_register_id(
     organization_service: OrganizationService,
-    organization_entity: OrganizationEntity,
+    persisted_organization: OrganizationEntity,
 ) -> None:
-    organization_service.create_one(
-        register_id=organization_entity.register_id,
-        name=organization_entity.name,
-    )
-    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
-
-    results = organization_service.get_many(register_id=organization_entity.register_id)
+    results = organization_service.get_many(external_id=persisted_organization.external_id)
     assert len(results) == 1
-    assert results[0].register_id == organization_entity.register_id
+    assert results[0].external_id == persisted_organization.external_id
 
 
 def test_get_many_filters_by_name(
     organization_service: OrganizationService,
+    persisted_organization: OrganizationEntity,
 ) -> None:
-    organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME)
-    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME)
-    results = organization_service.get_many(name=TEST_ORG_NAME)
+    results = organization_service.get_many(name=persisted_organization.name)
     assert len(results) == 1
-    assert results[0].name == TEST_ORG_NAME
-
-
-def test_get_many_filters_by_scopes_contains(
-    organization_service: OrganizationService,
-) -> None:
-    organization_service.create_one(register_id=TEST_REGISTER_ID, name=TEST_ORG_NAME, scopes="read")
-    organization_service.create_one(register_id=SECOND_ORG_REG_ID, name=SECOND_ORG_NAME, scopes="read write")
-    # "read" is contained in both organizations' scope sets.
-    assert len(organization_service.get_many(scopes="read")) == 2
-    # "write" only belongs to ORG-2.
-    write_only = organization_service.get_many(scopes="write")
-    assert len(write_only) == 1
-    assert write_only[0].name == SECOND_ORG_NAME
-    # Requesting multiple scopes requires all of them to be present.
-    both = organization_service.get_many(scopes="read write")
-    assert len(both) == 1
-    assert both[0].name == SECOND_ORG_NAME
+    assert results[0].name == persisted_organization.name

@@ -4,7 +4,9 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, and_, select
 
 from app.db.models.client import ClientEntity
+from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase
+from app.models.oin import Oin
 
 
 class ClientRepository(RepositoryBase):
@@ -22,17 +24,22 @@ class ClientRepository(RepositoryBase):
 
     def get_many(
         self,
-        organization_id: UUID | None = None,
         client_id: UUID | None = None,
+        organization_id: UUID | None = None,
+        organization_external_id: Oin | None = None,
         certificate_domain: str | None = None,
         certificate_organization_identifier: str | None = None,
         include_deleted: bool = False,
     ) -> Sequence[ClientEntity]:
+        stmt = select(ClientEntity)
         conditions = []
-        if organization_id is not None:
-            conditions.append(ClientEntity.organization_id == organization_id)
         if client_id is not None:
             conditions.append(ClientEntity.id == client_id)
+        if organization_id is not None:
+            conditions.append(ClientEntity.organization_id == organization_id)
+        if organization_external_id is not None:
+            stmt = stmt.join(ClientEntity.organization)
+            conditions.append(OrganizationEntity.external_id == organization_external_id)
         if certificate_domain is not None:
             conditions.append(ClientEntity.certificates.any(domain=certificate_domain))
         if certificate_organization_identifier is not None:
@@ -41,7 +48,7 @@ class ClientRepository(RepositoryBase):
             )
         if not include_deleted:
             conditions.append(ClientEntity.deleted_at.is_(None))
-        stmt = select(ClientEntity).where(and_(*conditions))
+        stmt = stmt.where(and_(*conditions))
         return self.db_session.session.execute(stmt).scalars().all()
 
     def _and_clause(self, organization_id: UUID, id: UUID) -> ColumnElement[bool]:

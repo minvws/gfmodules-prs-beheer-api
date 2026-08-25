@@ -5,9 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from app.container import get_organization_service
-from app.logging.events import Log
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
-from app.services.exceptions import OrganizationHasClientsError
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -30,7 +28,6 @@ def get_by_id(
     logger.debug("Fetching organization id=%s", id)
     result = service.get_one(id)
     if result is None:
-        logger.debug("Organization not found id=%s", id)
         raise HTTPException(status_code=404)
     return result
 
@@ -40,13 +37,6 @@ def get_many(
     params: Annotated[OrganizationQueryParams, Query()],
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Any:
-    # TODO GB: Include deleted
-    logger.debug(
-        "Listing organizations register_id=%s name=%s include_deleted=%s",
-        params.external_id,
-        params.name,
-        params.include_deleted,
-    )
     return service.get_many(**params.model_dump())
 
 
@@ -56,7 +46,6 @@ def update(
     body: OrganizationUpdate,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Organization:
-    logger.debug("Updating organization id=%s fields=%s", id, list(body.model_dump().keys()))
     return service.update_one(id, body)
 
 
@@ -65,16 +54,4 @@ def delete(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Organization:
-    logger.debug("Deleting organization id=%s", id)
-    try:
-        result = service.delete_one(id)
-    except OrganizationHasClientsError as error:
-        logger.warning("Organization delete rejected id=%s: %s", id, error)
-        raise HTTPException(status_code=409, detail=str(error))
-    Log.event(
-        logger,
-        Log.ORGANIZATION_WITHDRAWN,
-        "organization registration withdrawn",
-        organisatie_oin=str(result.id),
-    )
-    return result
+    return service.delete_one(id)

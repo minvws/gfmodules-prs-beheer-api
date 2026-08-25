@@ -28,7 +28,9 @@ class ClientEntity(AdminBase, WithUUID, WithTimestamps):
 
     certificates: Mapped[list[CertificateEntity]] = Relationship(secondary=client_certificates)
 
-    request_personal_id_types: Mapped[list[OrganizationPersonalIdTypeEntity]] = relationship()
+    request_personal_id_types: Mapped[list[OrganizationPersonalIdTypeEntity]] = relationship(
+        back_populates="client", cascade="all, delete-orphan"
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return {

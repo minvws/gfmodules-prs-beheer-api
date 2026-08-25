@@ -1,9 +1,5 @@
 from datetime import datetime, timezone
-from re import A
 from uuid import uuid4
-
-import pytest
-from sqlalchemy.exc import InvalidRequestError
 
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity

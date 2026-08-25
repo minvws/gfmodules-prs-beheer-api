@@ -12,7 +12,15 @@ from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
 from app.db.session import DbSession
-from app.models.client import Client, ClientFields, ClientQueryParams, ResolveRequest, ResolveResponse
+from app.models.client import (
+    Client,
+    ClientCreate,
+    ClientFields,
+    ClientQueryParams,
+    ClientUpdate,
+    ResolveRequest,
+    ResolveResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,13 +38,13 @@ class ClientService:
         organization = org_repo.get_one(organization_id)
         if not organization:
             logger.debug("Organization %s not found", organization_id)
-            raise HTTPException(status_code=404, detail="Organization not found.")
+            raise HTTPException(status_code=404, detail="Organization not found")
         return organization
 
     def create_one(
         self,
         organization_id: UUID,
-        input: ClientFields,
+        input: ClientCreate,
     ) -> Client:
         with self.db.get_db_session() as session:
             organization = self._get_organization_or_404(session, organization_id)
@@ -85,8 +93,8 @@ class ClientService:
 
             return [Client(**entity.to_dict()) for entity in entities]
 
-    def update_one(self, id: UUID, organization_id: UUID, update: ClientFields) -> Client:
-        with self.db.get_db_session() as session:
+    def update_one(self, id: UUID, organization_id: UUID, update: ClientUpdate) -> Client:
+        with self.db.get_db_session(commit=True) as session:
             organization = self._get_organization_or_404(session, organization_id)
             organization_pids = [pide.name for pide in organization.request_personal_id_types]
 
@@ -103,11 +111,16 @@ class ClientService:
             client_entity = repo.get_one(organization_id, id)
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
-                raise HTTPException(status_code=404)
-            client_entity.updated_at = datetime.now(tz=timezone.utc)
+                raise HTTPException(status_code=404, detail="Client not found")
+            now = datetime.now(timezone.utc)
+            client_entity.updated_at = now
             client_entity.certificates = certificates
+            if client_entity.deleted_at and not update.deleted:
+                client_entity.deleted_at = None
+            if not client_entity.deleted_at and update.deleted:
+                client_entity.deleted_at = now
+
             ClientService.update_request_personal_id_types(client_entity, update, organization)
-            session.commit()
             return Client(**client_entity.to_dict())
 
     @staticmethod
@@ -127,6 +140,7 @@ class ClientService:
                 OrganizationPersonalIdTypeEntity(organization_id=organization.id, personal_id_type=entry_to_add)
             )
 
+        # TODO: Check with Fouad
         for entry_to_remove in to_remove:
             client_entity.request_personal_id_types.remove(entry_to_remove)
 
@@ -147,6 +161,7 @@ class ClientService:
             client_repo = session.get_repository(ClientRepository)
             entities = client_repo.get_many(
                 client_id=resolve_request.client_id,
+                organization_external_id=resolve_request.organization_external_id,
                 certificate_domain=resolve_request.certificate_domain,
                 certificate_organization_identifier=resolve_request.certificate_organization_identifier,
             )
@@ -157,6 +172,8 @@ class ClientService:
                 raise HTTPException(status_code=404, detail="Client authorization does not exist for given parameters")
             entity = entities[0]
             return ResolveResponse(
-                organization_name=entity.organization.external_id.value,
-                scopes=["prs:" + str(rpit) for rpit in entity.request_personal_id_types],
+                organization_name=entity.organization.name,
+                scopes=" ".join(
+                    ["prs:" + str(rpit.personal_id_type.name) for rpit in entity.request_personal_id_types]
+                ),
             )

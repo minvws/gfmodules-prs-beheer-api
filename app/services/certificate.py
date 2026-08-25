@@ -28,7 +28,7 @@ class CertificateService:
                     updated_at=now,
                 )
             )
-            session.session.flush()
+            session.flush()
             return Certificate(**entity.to_dict())
 
     def get_many(self, organization_id: UUID, query_params: CertificateQueryParams) -> list[Certificate]:

@@ -2,7 +2,6 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import selectinload
 
 from app.db.models.organization import OrganizationEntity

@@ -1,9 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-import pytest
-from sqlalchemy.exc import IntegrityError, InvalidRequestError
-
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
 from app.db.session import DbSession

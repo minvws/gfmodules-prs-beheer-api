@@ -9,7 +9,7 @@ from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from app.config import ConfigDatabase
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
-from tests.conftest import TEST_ORG_NAME, TEST_EXTERNAL_ID
+from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME
 
 
 def _failing(*errors: Exception) -> Callable[..., Any]:

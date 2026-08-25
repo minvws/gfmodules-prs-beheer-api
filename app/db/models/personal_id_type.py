@@ -18,7 +18,7 @@ class PersonalIdTypeEntity(AdminBase):
         primary_key=True,
     )
 
-    name: Mapped[PersonalIdType] = mapped_column(Enum(PersonalIdType))
+    name: Mapped[PersonalIdType] = mapped_column(Enum(PersonalIdType), unique=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

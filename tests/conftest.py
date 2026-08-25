@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from app.application import request_validation_exception_handler
 from app.config import ConfigDatabase
@@ -20,22 +20,30 @@ from app.db.models.organization_personal_id_type import OrganizationPersonalIdTy
 from app.db.models.personal_id_type import PersonalIdTypeEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.personal_id_type import PersonalIdTypeRepository
 from app.db.session import DbSession
 from app.enums.personal_id_type import PersonalIdType
+from app.models.client import Client
 from app.models.oin import Oin
-from app.models.organization import Organization, OrganizationCreate
+from app.models.organization import Organization
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
+from app.services.certificate import CertificateService
 from app.services.client import ClientService
 from app.services.organization import OrganizationService
 
 TEST_OIN = Oin("00000099000000001000")
+TEST_OIN_2 = Oin("00000099000000002000")
 TEST_EXTERNAL_ID = Oin("00000099000000009000")
 TEST_ORG_NAME = "Test Organization"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
 FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+DEFAULT_RECEIVE_PERSONAL_ID_TYPES = [PersonalIdType.OPRF]
+DEFAULT_REQUEST_PERSONAL_ID_TYPES = [PersonalIdType.REVERSIBLE_PSEUDONYM]
+CERTIFICATE_ID = uuid4()
+DEFAULT_CERTIFICATES = [CERTIFICATE_ID]
 
 
 @pytest.fixture()
@@ -44,17 +52,20 @@ def database() -> Generator[Database, Any, None]:
     db = Database(config_database=config_database)
     with db.get_db_session(commit=True) as session:
         session.session.execute(text("ATTACH DATABASE ':memory:' as admin"))
+        session.session.execute(text("PRAGMA foreign_keys=ON"))
     db.generate_tables()
+    with db.get_db_session(commit=True) as session:
+        session.add(PersonalIdTypeEntity(name=PersonalIdType.OPRF))
+        session.add(PersonalIdTypeEntity(name=PersonalIdType.REVERSIBLE_PSEUDONYM))
+
     yield db
     db.engine.dispose()
 
 
 @pytest.fixture()
 def db_session(database: Database) -> Generator[DbSession, Any, None]:
-    print("SESSION START")
     with database.get_db_session() as session:
         yield session
-    print("SESSION STOP")
 
 
 @pytest.fixture()
@@ -69,8 +80,18 @@ def client_repository(db_session: DbSession) -> ClientRepository:
 
 
 @pytest.fixture()
+def personal_id_type_repository(db_session: DbSession) -> PersonalIdTypeRepository:
+    return PersonalIdTypeRepository(db_session=db_session)
+
+
+@pytest.fixture()
 def organization_service(database: Database) -> OrganizationService:
     return OrganizationService(database)
+
+
+@pytest.fixture()
+def certificate_service(database: Database) -> CertificateService:
+    return CertificateService(database)
 
 
 @pytest.fixture()
@@ -83,14 +104,6 @@ def client_service(
 @pytest.fixture()
 def organization_entity() -> OrganizationEntity:
     return OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME)
-
-
-@pytest.fixture()
-def persisted_personal_id_type_entity(db_session) -> PersonalIdTypeEntity:
-    pite = PersonalIdTypeEntity(name="OPRF")
-    db_session.add(pite)
-    db_session.commit()
-    return pite
 
 
 @pytest.fixture()
@@ -107,7 +120,7 @@ def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
 
 
 @pytest.fixture()
-def persisted_client_entity(db_session, client_entity: ClientEntity) -> ClientEntity:
+def persisted_client_entity(db_session: DbSession, client_entity: ClientEntity) -> ClientEntity:
     db_session.add(client_entity)
     db_session.commit()
     return client_entity
@@ -115,16 +128,24 @@ def persisted_client_entity(db_session, client_entity: ClientEntity) -> ClientEn
 
 @pytest.fixture()
 def persisted_organization(
-    db_session: DbSession, persisted_personal_id_type_entity: PersonalIdTypeEntity
+    db_session: DbSession, personal_id_type_repository: PersonalIdTypeRepository
 ) -> OrganizationEntity:
+    personal_ids = personal_id_type_repository.get_many([PersonalIdType.OPRF])
     org = OrganizationEntity(
         external_id=TEST_EXTERNAL_ID,
         name=TEST_ORG_NAME,
-        receive_personal_id_types=[persisted_personal_id_type_entity],
-        request_personal_id_types=[persisted_personal_id_type_entity],
+        receive_personal_id_types=list(personal_ids),
+        request_personal_id_types=list(personal_ids),
     )
     db_session.add(org)
     db_session.commit()
+
+    print(
+        [
+            (pite.id, pite.name, pite.created_at)
+            for pite in db_session.execute(select(PersonalIdTypeEntity)).scalars().all()
+        ]
+    )
     return org
 
 
@@ -136,7 +157,6 @@ def mock_client_service() -> MagicMock:
 @pytest.fixture()
 def mock_organization_service() -> MagicMock:
     service = MagicMock(spec=OrganizationService)
-    service.exists.return_value = True
     return service
 
 
@@ -154,17 +174,22 @@ def api(mock_client_service: MagicMock, mock_organization_service: MagicMock) ->
 def make_organization_entity(
     *,
     id: UUID | None = None,
-    register_id: Oin = VALID_OIN,
-    name: str = "Test Organization",
-    scopes: str | None = None,
+    external_id: Oin = VALID_OIN,
+    name: str = TEST_ORG_NAME,
+    receive_personal_id_types: list[PersonalIdType] = DEFAULT_RECEIVE_PERSONAL_ID_TYPES,
+    request_personal_id_types: list[PersonalIdType] = DEFAULT_REQUEST_PERSONAL_ID_TYPES,
+    created_at: datetime | None = None,
+    updated_at: datetime | None = None,
     deleted_at: datetime | None = None,
-) -> OrganizationEntity:
-    return OrganizationEntity(
+) -> Organization:
+    return Organization(
         id=id or uuid4(),
-        register_id=register_id,
+        external_id=external_id,
         name=name,
-        scopes=scopes,
-        created_at=FIXED_CREATED_AT,
+        receive_personal_id_types=receive_personal_id_types,
+        request_personal_id_types=request_personal_id_types,
+        created_at=created_at or FIXED_CREATED_AT,
+        updated_at=updated_at or FIXED_CREATED_AT,
         deleted_at=deleted_at,
     )
 
@@ -173,19 +198,18 @@ def make_client_entity(
     *,
     id: UUID | None = None,
     organization_id: UUID | None = None,
-    oin: Oin = VALID_OIN,
-    common_name: str = "Test Client",
-    scopes: str | None = None,
+    request_personal_id_types: list[PersonalIdType] = DEFAULT_REQUEST_PERSONAL_ID_TYPES,
+    certificates: list[UUID] = DEFAULT_CERTIFICATES,
+    created_at: datetime | None = None,
+    updated_at: datetime | None = None,
     deleted_at: datetime | None = None,
-    org_entity: OrganizationEntity | None = None,
-) -> ClientEntity:
-    return ClientEntity(
+) -> Client:
+    return Client(
         id=id or uuid4(),
-        organization_id=organization_id or (org_entity.id if org_entity else uuid4()),
-        oin=oin,
-        common_name=common_name,
-        scopes=scopes,
-        created_at=FIXED_CREATED_AT,
+        organization_id=organization_id or uuid4(),
+        request_personal_id_types=request_personal_id_types,
+        certificates=certificates,
+        created_at=created_at or FIXED_CREATED_AT,
+        updated_at=updated_at or FIXED_CREATED_AT,
         deleted_at=deleted_at,
-        organization=org_entity,
     )

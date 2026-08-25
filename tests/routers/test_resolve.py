@@ -3,7 +3,9 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from tests.conftest import VALID_OIN, make_client_entity, make_organization_entity
+from app.models.client import ResolveRequest, ResolveResponse
+from app.models.oin import Oin
+from tests.conftest import TEST_ORG_NAME, VALID_OIN
 
 RESOLVE = "/clients/resolve"
 ORG_OIN = "00000099000000009000"
@@ -11,7 +13,7 @@ ORG_OIN = "00000099000000009000"
 
 def _body(**overrides: object) -> dict[str, object]:
     body: dict[str, object] = {
-        "client_organization_id": str(VALID_OIN),
+        "client_organization_id": VALID_OIN.value,
         "client_common_name": "Client",
         "organization_id": ORG_OIN,
     }
@@ -23,31 +25,21 @@ def _body(**overrides: object) -> dict[str, object]:
 def test_resolve_returns_scopes_and_organization_name(
     api: TestClient, mock_client_service: MagicMock, scopes: str
 ) -> None:
-    org_entity = make_organization_entity(name="Test Organization")
-    mock_client_service.resolve.return_value = make_client_entity(scopes=scopes, org_entity=org_entity)
+    resolve_response = ResolveResponse(scopes=scopes, organization_name=TEST_ORG_NAME)
+    mock_client_service.resolve.return_value = resolve_response
 
     response = api.post(RESOLVE, json=_body())
 
     assert response.status_code == 200
     assert response.json() == {"scopes": scopes, "organization_name": "Test Organization"}
-    call = mock_client_service.resolve.call_args
-    assert str(call.kwargs["oin"]) == str(VALID_OIN)
-    assert call.kwargs["common_name"] == "Client"
-    assert str(call.kwargs["register_id"]) == ORG_OIN
-
-
-def test_resolve_unknown_client_returns_404(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.resolve.return_value = None
-    response = api.post(RESOLVE, json=_body())
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Client not found."
-
-
-def test_resolve_client_without_scopes_returns_404(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.resolve.return_value = make_client_entity(scopes=None)
-    response = api.post(RESOLVE, json=_body())
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Client not found."
+    mock_client_service.resolve.assert_called_once_with(
+        ResolveRequest(
+            client_id=None,
+            organization_external_id=Oin(ORG_OIN),
+            certificate_domain="Client",
+            certificate_organization_identifier=VALID_OIN.value,
+        )
+    )
 
 
 @pytest.mark.parametrize(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import String
+from sqlalchemy import Index, String, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.models.base import (
@@ -23,6 +23,15 @@ if TYPE_CHECKING:
 
 class OrganizationEntity(AdminBase, WithUUID, WithTimestamps):
     __tablename__ = "organizations"
+    __table_args__ = (
+        Index(
+            "idx_admin_organizations_unique_external_id",
+            "external_id",
+            unique=True,
+            sqlite_where=text("deleted_at IS NULL"),
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
 
     # This is currently pinned to the OIN TYPE. But it's likely that in the future we also
     # need to support additional external_id types.

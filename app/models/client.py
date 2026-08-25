@@ -28,12 +28,27 @@ class ClientFields(BaseModel):
     certificates: list[UUID] = []
 
 
+class ClientCreate(ClientFields):
+    pass
+
+
+class ClientUpdate(ClientFields):
+    deleted: bool = Field(examples=[False])
+
+
 class ClientQueryParams(BaseModel):
     include_deleted: bool = Field(default=False, description=INCLUDE_DELETED_DESCRIPTION)
 
 
 class Client(Base, ClientReadFields, ClientFields):
     organization_id: UUID
+
+
+class DeprecatedResolveRequest(BaseModel):
+    # TODO DEprecated message
+    client_organization_id: Oin = Field(description=ORGANIZATION_IDENTIFIER_DESCRIPTION, deprecated=True)
+    client_common_name: str = Field(description=DOMAIN_DESCRIPTION, deprecated=True)
+    organization_id: Oin = Field(description=EXTERNAL_ID_DESCRIPTION, deprecated=True)
 
 
 # TODO GB Make backwards compatible
@@ -46,5 +61,5 @@ class ResolveRequest(BaseModel):
 
 class ResolveResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    scopes: list[str] = Field()
+    scopes: str = Field()
     organization_name: str | None = Field(default=None, description=ORGANIZATION_NAME_DESCRIPTION)
