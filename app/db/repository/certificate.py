@@ -27,7 +27,6 @@ class CertificateRepository(RepositoryBase):
         clauses = [CertificateEntity.organization_id == organization_id]
         if certificate_ids is not None:
             clauses.append(CertificateEntity.id.in_(certificate_ids))
-        print(include_deleted)
         if not include_deleted:
             clauses.append(CertificateEntity.deleted_at.is_(None))
         stmt = select(CertificateEntity).where(and_(*clauses))

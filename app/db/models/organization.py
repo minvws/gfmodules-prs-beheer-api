@@ -18,8 +18,8 @@ from app.models.oin import Oin
 if TYPE_CHECKING:
     from app.db.models.certificate import CertificateEntity
     from app.db.models.client import ClientEntity
-    from app.db.models.personal_id_type import PersonalIdTypeEntity
     from app.db.models.hsm_key_versions import HsmKeyVersionEntity
+    from app.db.models.personal_id_type import PersonalIdTypeEntity
 
 
 class OrganizationEntity(Base, WithUUID, WithTimestamps):

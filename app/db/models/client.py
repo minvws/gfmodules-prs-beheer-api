@@ -16,7 +16,7 @@ from app.db.models.base import (
 if TYPE_CHECKING:
     from app.db.models.certificate import CertificateEntity
     from app.db.models.organization import OrganizationEntity
-    from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
+    from app.db.models.organization_personal_id_type import ClientPersonalIdTypeEntity
 
 
 class ClientEntity(Base, WithUUID, WithTimestamps):
@@ -29,7 +29,7 @@ class ClientEntity(Base, WithUUID, WithTimestamps):
 
     certificates: Mapped[list[CertificateEntity]] = Relationship(secondary=client_certificates)
 
-    request_personal_id_types: Mapped[list[OrganizationPersonalIdTypeEntity]] = relationship(
+    request_personal_id_types: Mapped[list[ClientPersonalIdTypeEntity]] = relationship(
         back_populates="client", cascade="all, delete-orphan"
     )
 

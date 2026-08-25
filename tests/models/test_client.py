@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
-from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
+from app.db.models.organization_personal_id_type import ClientPersonalIdTypeEntity
 from app.db.models.personal_id_type import PersonalIdTypeEntity
 from app.enums.personal_id_type import PersonalIdType
 from app.models.client import (
@@ -49,7 +49,7 @@ def test_response_model_from_entity() -> None:
         organization_id=uuid4(),
         certificates=[CertificateEntity(id=uuid4())],
         request_personal_id_types=[
-            OrganizationPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
+            ClientPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
         ],
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),
@@ -65,7 +65,7 @@ def test_response_model_from_entity_deleted() -> None:
         organization_id=uuid4(),
         certificates=[CertificateEntity(id=uuid4())],
         request_personal_id_types=[
-            OrganizationPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
+            ClientPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
         ],
         created_at=datetime.now(timezone.utc),
         updated_at=datetime.now(timezone.utc),

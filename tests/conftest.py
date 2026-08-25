@@ -16,7 +16,7 @@ from app.container import get_client_service, get_organization_service
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
-from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
+from app.db.models.organization_personal_id_type import ClientPersonalIdTypeEntity
 from app.db.models.personal_id_type import PersonalIdTypeEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
@@ -71,7 +71,6 @@ def db_session(database: Database) -> Generator[DbSession, Any, None]:
 
 @pytest.fixture()
 def organization_repository(db_session: DbSession) -> OrganizationRepository:
-    print("GET_ORG_REPO")
     return OrganizationRepository(db_session=db_session)
 
 
@@ -112,7 +111,7 @@ def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
     return ClientEntity(
         organization_id=persisted_organization.id,
         request_personal_id_types=[
-            OrganizationPersonalIdTypeEntity(
+            ClientPersonalIdTypeEntity(
                 organization_id=persisted_organization.id,
                 personal_id_type_id=persisted_organization.receive_personal_id_types[0].id,
             )
@@ -140,13 +139,6 @@ def persisted_organization(
     )
     db_session.add(org)
     db_session.commit()
-
-    print(
-        [
-            (pite.id, pite.name, pite.created_at)
-            for pite in db_session.execute(select(PersonalIdTypeEntity)).scalars().all()
-        ]
-    )
     return org
 
 

@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
-from app.db.models.organization_personal_id_type import OrganizationPersonalIdTypeEntity
+from app.db.models.organization_personal_id_type import ClientPersonalIdTypeEntity
 from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
@@ -15,7 +15,6 @@ from app.db.session import DbSession
 from app.models.client import (
     Client,
     ClientCreate,
-    ClientFields,
     ClientQueryParams,
     ClientUpdate,
     ResolveRequest,
@@ -63,7 +62,7 @@ class ClientService:
             entity = ClientEntity(
                 organization_id=organization_id,
                 request_personal_id_types=[
-                    OrganizationPersonalIdTypeEntity(
+                    ClientPersonalIdTypeEntity(
                         personal_id_type_id=request_by_pid[personal_id_type].id,
                         organization_id=organization.id,
                     )
@@ -121,7 +120,7 @@ class ClientService:
                 client_entity.deleted_at = now
 
             updated = [
-                OrganizationPersonalIdTypeEntity(personal_id_type=rpit, organization_id=organization.id)
+                ClientPersonalIdTypeEntity(personal_id_type=rpit, organization_id=organization.id)
                 for rpit in organization.request_personal_id_types
                 if rpit.name in update.request_personal_id_types
             ]

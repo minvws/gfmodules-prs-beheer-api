@@ -12,7 +12,7 @@ from app.db.models.base import Base
 from app.db.models.personal_id_type import PersonalIdTypeEntity
 
 
-class OrganizationPersonalIdTypeEntity(Base):
+class ClientPersonalIdTypeEntity(Base):
     __tablename__ = "client_request_personal_id_types"
     __table_args__: tuple[Any, ...] = (
         ForeignKeyConstraint(

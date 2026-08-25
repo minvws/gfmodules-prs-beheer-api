@@ -1,13 +1,11 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from sqlalchemy import UUID, Column, DateTime, ForeignKey, Integer
-from sqlalchemy.orm import Mapped, Relationship, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Relationship, mapped_column
 
 from app.db.models.base import Base
-
-
 from app.db.models.organization import OrganizationEntity
 
 
@@ -26,6 +24,7 @@ class HsmKeyVersionEntity(Base):
     def to_dict(self) -> dict[str, Any]:
         return {
             "id": str(self.id),
+            "organization_id": str(self.organization_id),
             "version": self.version,
             "from_dt": self.from_dt,
             "until_dt": self.until_dt,
