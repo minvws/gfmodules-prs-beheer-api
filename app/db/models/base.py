@@ -81,38 +81,3 @@ organization_request_personal_id_types = Table(
     Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
     schema="admin",
 )
-
-# client_request_personal_id_types = Table(
-#    "client_request_personal_id_types",
-#    admin_metadata_obj,
-#    Column("client_id", UUID, ForeignKey("admin.clients.id"), primary_key=True),
-#    Column("organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True),
-#    Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
-#    ForeignKeyConstraint(
-#        ["organization_id", "personal_id_type_id"],
-#        [
-#            "admin.organization_request_personal_id_types.organization_id",
-#            "admin.organization_request_personal_id_types.personal_id_type_id",
-#        ],
-#    ),
-# )
-# client_request_personal_id_types = Table(
-#    "client_request_personal_id_types",
-#    admin_metadata_obj,
-#    Column("client_id", UUID, ForeignKey("admin.client.id"), primary_key=True),
-#    Column("organization_id", UUID, primary_key=True),
-#    Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
-#    ForeignKeyConstraint(
-#        ["organization_id", "personal_id_type_id"],
-#        [
-#            "admin.organization_request_personal_id_types.organization_id",
-#            "admin.organization_request_personal_id_types.personal_id_type_id",
-#        ],
-#    ),
-# )
-# client_request_personal_id_types = Table(
-#    "client_request_personal_id_types",
-#    admin_metadata_obj,
-#    Column("organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True),
-#    Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_type.id"), primary_key=True),
-# )
