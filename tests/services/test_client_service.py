@@ -10,7 +10,6 @@ from app.enums.personal_id_type import PersonalIdType
 from app.models.certificate import CertificateFields
 from app.models.client import (
     ClientCreate,
-    ClientFields,
     ClientQueryParams,
     ClientUpdate,
     ResolveRequest,

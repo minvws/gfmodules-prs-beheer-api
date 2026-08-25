@@ -8,7 +8,7 @@ from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.enums.personal_id_type import PersonalIdType
-from app.models.client import ClientCreate, ClientFields, ClientUpdate
+from app.models.client import ClientCreate, ClientUpdate
 from app.models.oin import Oin
 from app.models.organization import OrganizationCreate, OrganizationUpdate
 from app.services.client import ClientService
