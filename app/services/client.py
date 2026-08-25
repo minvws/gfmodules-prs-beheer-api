@@ -120,29 +120,13 @@ class ClientService:
             if not client_entity.deleted_at and update.deleted:
                 client_entity.deleted_at = now
 
-            ClientService.update_request_personal_id_types(client_entity, update, organization)
+            updated = [
+                OrganizationPersonalIdTypeEntity(personal_id_type=rpit, organization_id=organization.id)
+                for rpit in organization.request_personal_id_types
+                if rpit.name in update.request_personal_id_types
+            ]
+            client_entity.request_personal_id_types = updated
             return Client(**client_entity.to_dict())
-
-    @staticmethod
-    def update_request_personal_id_types(
-        client_entity: ClientEntity,
-        client_update: ClientFields,
-        organization: OrganizationEntity,
-    ) -> None:
-        current = {_type.personal_id_type.name for _type in client_entity.request_personal_id_types}
-        updated = set(client_update.request_personal_id_types)
-
-        to_add = updated - current
-        to_remove = [e for e in client_entity.request_personal_id_types if e.personal_id_type.name not in updated]
-
-        for entry_to_add in to_add:
-            client_entity.request_personal_id_types.append(
-                OrganizationPersonalIdTypeEntity(organization_id=organization.id, personal_id_type=entry_to_add)
-            )
-
-        # TODO: Check with Fouad
-        for entry_to_remove in to_remove:
-            client_entity.request_personal_id_types.remove(entry_to_remove)
 
     def delete_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
@@ -156,7 +140,6 @@ class ClientService:
             return Client(**client_entity.to_dict())
 
     def resolve(self, resolve_request: ResolveRequest) -> ResolveResponse:
-        # TODO GB: deprecate support, but stay backwards compatible
         with self.db.get_db_session() as session:
             client_repo = session.get_repository(ClientRepository)
             entities = client_repo.get_many(
