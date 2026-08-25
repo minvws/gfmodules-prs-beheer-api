@@ -9,7 +9,7 @@ from app.models.oin import Oin
 
 DOMAIN_DESCRIPTION = "The domain of the client certificate registered in the CN or the SAN"
 ORGANIZATION_IDENTIFIER_DESCRIPTION = "The organization_identifier of the client certificate"
-EXTERNAL_ID_DESCRIPTION = "The external_id of the Client. Currently limitted and transformed to OIN"
+EXTERNAL_ID_DESCRIPTION = "The external_id of the Client. Currently limited and transformed to OIN"
 CLIENT_ID_DESCRIPTION = "The assigned id of the Cient."
 ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on behalf of"
 
