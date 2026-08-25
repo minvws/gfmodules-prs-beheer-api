@@ -3,85 +3,75 @@ from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import IntegrityError
 
-from app.services.exceptions import ScopesNotGrantedError
-from tests.conftest import VALID_OIN, make_client_entity
+from app.enums.personal_id_type import PersonalIdType
+from app.models.client import ClientCreate, ClientQueryParams, ClientUpdate
+from tests.conftest import CERTIFICATE_ID, FIXED_CREATED_AT, make_client_entity
 
 ORG_ID = "11111111-1111-1111-1111-111111111111"
 CLIENT_ID = "22222222-2222-2222-2222-222222222222"
 BASE = f"/organizations/{ORG_ID}/clients"
 
+CLIENT_BODIES = [
+    {},
+    {
+        "certificates": [str(CERTIFICATE_ID)],
+    },
+    {
+        "request_personal_id_types": ["oprf"],
+        "certificates": ["INVALID"],
+    },
+]
 
-def _create_body(**overrides: object) -> dict[str, object]:
-    body: dict[str, object] = {"oin": str(VALID_OIN), "common_name": "Client"}
-    body.update(overrides)
-    return body
 
-
-@pytest.mark.parametrize(
-    "method, path, body",
-    [
-        ("post", BASE, {"oin": str(VALID_OIN), "common_name": "C"}),
-        ("get", f"{BASE}/{CLIENT_ID}", None),
-        ("get", BASE, None),
-        ("put", f"{BASE}/{CLIENT_ID}", {"common_name": "C"}),
-        ("delete", f"{BASE}/{CLIENT_ID}", None),
-    ],
-)
-def test_returns_404_when_organization_missing(
+def test_register_returns_201(
     api: TestClient,
-    mock_organization_service: MagicMock,
-    method: str,
-    path: str,
-    body: dict[str, object] | None,
+    mock_client_service: MagicMock,
 ) -> None:
-    mock_organization_service.exists.return_value = False
-    response = api.request(method, path, json=body)
-    assert response.status_code == 404
-    assert response.json()["detail"] == "Organization not found."
-
-
-def test_register_returns_201(api: TestClient, mock_client_service: MagicMock) -> None:
     entity = make_client_entity(organization_id=UUID(ORG_ID))
     mock_client_service.create_one.return_value = entity
 
-    response = api.post(BASE, json=_create_body())
+    body = {
+        "request_personal_id_types": ["oprf"],
+        "certificates": [str(CERTIFICATE_ID)],
+    }
+
+    response = api.post(BASE, json=body)
     assert response.status_code == 201
     data = response.json()
-    assert data["id"] == str(entity.id)
-    assert data["oin"] == str(VALID_OIN)
+    assert data == {
+        "id": str(entity.id),
+        "organization_id": ORG_ID,
+        "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "certificates": [str(CERTIFICATE_ID)],
+        "request_personal_id_types": ["reversible_pseudonym"],
+    }
 
-    call = mock_client_service.create_one.call_args
-    assert call.kwargs["organization_id"] == UUID(ORG_ID)
-    assert call.kwargs["oin"] == VALID_OIN
-    assert call.kwargs["common_name"] == "Client"
-
-
-def test_register_ungranted_scope_returns_422(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.create_one.side_effect = ScopesNotGrantedError({"write"})
-    response = api.post(BASE, json=_create_body(scopes="read write"))
-    assert response.status_code == 422
-
-
-def test_register_conflict_returns_409(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.create_one.side_effect = IntegrityError("stmt", {}, Exception("duplicate"))
-    response = api.post(BASE, json=_create_body())
-    assert response.status_code == 409
+    mock_client_service.create_one.assert_called_once_with(
+        UUID(ORG_ID),
+        ClientCreate(
+            request_personal_id_types=[PersonalIdType.OPRF],
+            certificates=[CERTIFICATE_ID],
+        ),
+    )
 
 
-@pytest.mark.parametrize(
-    "body",
-    [
-        {"common_name": "C"},  # missing oin
-        {"oin": str(VALID_OIN)},  # missing common_name
-        {"oin": "invalid-oin", "common_name": "C"},  # malformed oin
-    ],
-)
+@pytest.mark.parametrize("body", CLIENT_BODIES)
 def test_register_invalid_body_returns_422(
     api: TestClient, mock_client_service: MagicMock, body: dict[str, object]
 ) -> None:
     response = api.post(BASE, json=body)
+    assert response.status_code == 422
+    mock_client_service.create_one.assert_not_called()
+
+
+def test_register_invalid_org_id_returns_422(api: TestClient, mock_client_service: MagicMock) -> None:
+    body = {
+        "request_personal_id_types": ["oprf"],
+        "certificates": [str(CERTIFICATE_ID)],
+    }
+    response = api.post("/organizations/INVALID/clients", json=body)
     assert response.status_code == 422
     mock_client_service.create_one.assert_not_called()
 
@@ -95,12 +85,6 @@ def test_get_by_id_returns_200(api: TestClient, mock_client_service: MagicMock) 
     assert response.status_code == 200
     assert response.json()["id"] == str(entity.id)
     mock_client_service.get_one.assert_called_once_with(entity.id, UUID(ORG_ID))
-
-
-def test_get_by_id_not_found_returns_404(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.get_one.return_value = None
-    response = api.get(f"{BASE}/{CLIENT_ID}")
-    assert response.status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -117,9 +101,7 @@ def test_get_by_id_invalid_uuid_returns_422(api: TestClient, path: str) -> None:
 
 @pytest.mark.parametrize("count", [0, 2])
 def test_get_many_returns_list(api: TestClient, mock_client_service: MagicMock, count: int) -> None:
-    mock_client_service.get_many.return_value = [
-        make_client_entity(organization_id=UUID(ORG_ID), common_name=f"CN-{i}") for i in range(count)
-    ]
+    mock_client_service.get_many.return_value = [make_client_entity(organization_id=UUID(ORG_ID)) for i in range(count)]
     response = api.get(BASE)
     assert response.status_code == 200
     assert len(response.json()) == count
@@ -130,76 +112,76 @@ def test_get_many_without_params_uses_defaults(api: TestClient, mock_client_serv
     api.get(BASE)
     mock_client_service.get_many.assert_called_once_with(
         organization_id=UUID(ORG_ID),
-        oin=None,
-        common_name=None,
-        scopes=None,
-        include_deleted=False,
+        client_query_params=ClientQueryParams(
+            include_deleted=False,
+        ),
     )
 
 
 def test_get_many_passes_query_params(api: TestClient, mock_client_service: MagicMock) -> None:
     mock_client_service.get_many.return_value = []
-    api.get(f"{BASE}?oin={VALID_OIN}&common_name=CN-1&scopes=read+write&include_deleted=true")
+    api.get(f"{BASE}?include_deleted=True")
+    mock_client_service.get_many.assert_called_once_with(
+        organization_id=UUID(ORG_ID),
+        client_query_params=ClientQueryParams(
+            include_deleted=True,
+        ),
+    )
 
-    call = mock_client_service.get_many.call_args
-    assert call.kwargs["organization_id"] == UUID(ORG_ID)
-    assert call.kwargs["oin"] == VALID_OIN
-    assert call.kwargs["common_name"] == "CN-1"
-    assert call.kwargs["scopes"] == "read write"
-    assert call.kwargs["include_deleted"] is True
 
-
-@pytest.mark.parametrize("query", ["oin=invalid-oin", "include_deleted=maybe"])
+@pytest.mark.parametrize("query", ["include_deleted=maybe"])
 def test_get_many_invalid_query_returns_422(api: TestClient, query: str) -> None:
     response = api.get(f"{BASE}?{query}")
     assert response.status_code == 422
 
 
 def test_update_returns_200(api: TestClient, mock_client_service: MagicMock) -> None:
-    entity = make_client_entity(organization_id=UUID(ORG_ID), common_name="Updated")
+    entity = make_client_entity(organization_id=UUID(ORG_ID))
     mock_client_service.update_one.return_value = entity
-    response = api.put(f"{BASE}/{entity.id}", json={"common_name": "Updated"})
+    body = {
+        "request_personal_id_types": ["oprf"],
+        "certificates": [],
+        "deleted": False,
+    }
+    response = api.put(f"{BASE}/{entity.id}", json=body)
+    data = response.json()
+    assert data == {
+        "id": str(entity.id),
+        "organization_id": ORG_ID,
+        "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "certificates": [str(CERTIFICATE_ID)],
+        "request_personal_id_types": ["reversible_pseudonym"],
+    }
+
+    mock_client_service.update_one.assert_called_once_with(
+        entity.id,
+        UUID(ORG_ID),
+        ClientUpdate(
+            request_personal_id_types=[PersonalIdType.OPRF],
+            certificates=[],
+            deleted=False,
+        ),
+    )
     assert response.status_code == 200
-    assert response.json()["common_name"] == "Updated"
 
 
-def test_update_not_found_returns_404(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.update_one.return_value = None
-    response = api.put(f"{BASE}/{CLIENT_ID}", json={"common_name": "X"})
-    assert response.status_code == 404
-
-
-def test_update_ungranted_scope_returns_422(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.update_one.side_effect = ScopesNotGrantedError({"write"})
-    response = api.put(f"{BASE}/{CLIENT_ID}", json={"scopes": "read write"})
-    assert response.status_code == 422
-
-
-@pytest.mark.parametrize(
-    "body, expected_kwargs",
-    [
-        ({"common_name": "N"}, {"common_name": "N"}),
-        ({"scopes": "read"}, {"scopes": "read"}),
-        ({}, {}),  # nothing supplied -> nothing forwarded
-    ],
-)
-def test_update_forwards_only_supplied_fields(
-    api: TestClient, mock_client_service: MagicMock, body: dict[str, object], expected_kwargs: dict[str, object]
-) -> None:
-    mock_client_service.update_one.return_value = make_client_entity(organization_id=UUID(ORG_ID))
-    api.put(f"{BASE}/{CLIENT_ID}", json=body)
-    mock_client_service.update_one.assert_called_once_with(UUID(CLIENT_ID), UUID(ORG_ID), **expected_kwargs)
-
-
-def test_delete_returns_204(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.delete_one.return_value = make_client_entity(organization_id=UUID(ORG_ID))
+def test_delete_returns_200(api: TestClient, mock_client_service: MagicMock) -> None:
+    mock_client_service.delete_one.return_value = make_client_entity(
+        id=UUID(CLIENT_ID),
+        organization_id=UUID(ORG_ID),
+        deleted_at=FIXED_CREATED_AT,
+    )
     response = api.delete(f"{BASE}/{CLIENT_ID}")
-    assert response.status_code == 204
-    assert response.content == b""
+    assert response.status_code == 200
+    data = response.json()
+    assert data == {
+        "id": CLIENT_ID,
+        "organization_id": ORG_ID,
+        "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "deleted_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "certificates": [str(CERTIFICATE_ID)],
+        "request_personal_id_types": ["reversible_pseudonym"],
+    }
     mock_client_service.delete_one.assert_called_once_with(UUID(CLIENT_ID), UUID(ORG_ID))
-
-
-def test_delete_not_found_returns_404(api: TestClient, mock_client_service: MagicMock) -> None:
-    mock_client_service.delete_one.return_value = None
-    response = api.delete(f"{BASE}/{CLIENT_ID}")
-    assert response.status_code == 404

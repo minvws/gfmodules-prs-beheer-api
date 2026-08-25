@@ -2,12 +2,15 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from app import scope_utils
+from fastapi import HTTPException
+
 from app.db.db import Database
+from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
+from app.db.repository.personal_id_type import PersonalIdTypeRepository
 from app.models.oin import Oin
-from app.services.exceptions import OrganizationHasClientsError, ScopesInUseError, ScopesNotGrantedError
+from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -16,87 +19,98 @@ class OrganizationService:
     def __init__(self, db: Database) -> None:
         self.db = db
 
-    def create_one(
-        self,
-        register_id: Oin,
-        name: str,
-        scopes: str | None = None,
-    ) -> OrganizationEntity:
-        with self.db.get_db_session() as session:
+    def create_one(self, input: OrganizationCreate) -> Organization:
+        with self.db.get_db_session(commit=True) as session:
             repo = session.get_repository(OrganizationRepository)
-            entity = OrganizationEntity(register_id=register_id, name=name, scopes=scopes)
-            return repo.add_one(entity)
+            personal_id_type_repo = session.get_repository(PersonalIdTypeRepository)
+            receive_personal_id_types = personal_id_type_repo.get_many(
+                [str(e) for e in input.receive_personal_id_types]
+            )
+            if len(receive_personal_id_types) != len(input.receive_personal_id_types):
+                raise HTTPException(status_code=404, detail="Not all of provided receive personal_id_types exists")
+            request_personal_id_types = personal_id_type_repo.get_many(
+                [str(e) for e in input.request_personal_id_types]
+            )
+            if len(request_personal_id_types) != len(input.request_personal_id_types):
+                raise HTTPException(status_code=404, detail="Not all of provided request personal_id_types exists")
+            entity: OrganizationEntity = repo.add_one(
+                OrganizationEntity(
+                    external_id=input.external_id,
+                    name=input.name,
+                    receive_personal_id_types=receive_personal_id_types,
+                    request_personal_id_types=request_personal_id_types,
+                    hsm_key_versions=[
+                        HsmKeyVersionEntity(
+                            version=0,
+                            from_dt=datetime.now(timezone.utc),
+                        ),
+                    ],
+                )
+            )
+            session.flush()
+            return Organization(**entity.to_dict())
 
-    def get_one(self, id: UUID) -> OrganizationEntity | None:
+    def get_one(self, id: UUID) -> Organization:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            return repo.get_one(id)
-
-    def exists(self, id: UUID) -> bool:
-        with self.db.get_db_session() as session:
-            repo = session.get_repository(OrganizationRepository)
-            return repo.exists(id)
+            entity = repo.get_one(id)
+            if not entity:
+                raise HTTPException(status_code=404, detail="Organization not found")
+            return Organization(**entity.to_dict())
 
     def get_many(
         self,
-        register_id: Oin | None = None,
+        external_id: Oin | None = None,
         name: str | None = None,
-        scopes: str | None = None,
         include_deleted: bool = False,
-    ) -> list[OrganizationEntity]:
+    ) -> list[Organization]:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            return list(
-                repo.get_many(register_id=register_id, name=name, scopes=scopes, include_deleted=include_deleted)
-            )
+            entities = repo.get_many(external_id=external_id, name=name, include_deleted=include_deleted)
 
-    def update_one(self, id: UUID, **kwargs: object) -> OrganizationEntity | None:
+            return [Organization(**entity.to_dict()) for entity in entities]
+
+    def update_one(self, id: UUID, organization_update: OrganizationUpdate) -> Organization:
+        with self.db.get_db_session(commit=True) as session:
+            repo = session.get_repository(OrganizationRepository)
+            personal_id_type_repo = session.get_repository(PersonalIdTypeRepository)
+            organization_entity = repo.get_one(id)
+            if not organization_entity:
+                logger.debug("Organization not found for update id=%s", id)
+                raise HTTPException(status_code=404, detail="Organization not found")
+            now = datetime.now(timezone.utc)
+            organization_entity.external_id = organization_update.external_id
+            organization_entity.name = organization_update.name
+            organization_entity.updated_at = now
+            if organization_entity.deleted_at and not organization_update.deleted:
+                organization_entity.deleted_at = None
+            if not organization_entity.deleted_at and organization_update.deleted:
+                organization_entity.deleted_at = now
+
+            receive_personal_id_types = personal_id_type_repo.get_many(organization_update.receive_personal_id_types)
+            if len(receive_personal_id_types) != len(organization_update.receive_personal_id_types):
+                raise HTTPException(status_code=404, detail="Not all of provided receive personal_id_types exists")
+
+            request_personal_id_types = personal_id_type_repo.get_many(organization_update.request_personal_id_types)
+            if len(request_personal_id_types) != len(organization_update.request_personal_id_types):
+                raise HTTPException(status_code=404, detail="Not all of provided request personal_id_types exists")
+
+            organization_entity.receive_personal_id_types = list(receive_personal_id_types)
+            organization_entity.request_personal_id_types = list(request_personal_id_types)
+
+            return Organization(**organization_entity.to_dict())
+
+    def delete_one(self, id: UUID) -> Organization:
         with self.db.get_db_session() as session:
             repo = session.get_repository(OrganizationRepository)
-            if "scopes" in kwargs:
-                self._assert_removed_scopes_unused(repo, id, kwargs["scopes"])  # type: ignore[arg-type]
-            return repo.update(id, **kwargs)
-
-    def _assert_removed_scopes_unused(self, repo: OrganizationRepository, id: UUID, new_scopes: str | None) -> None:
-        current = repo.get_one_with_clients(id)
-        if current is None:
-            return
-        removed = scope_utils.parse(current.scopes) - scope_utils.parse(new_scopes)
-        if not removed:
-            return
-        in_use = removed & {
-            scope
-            for client in current.clients
-            if client.deleted_at is None
-            for scope in scope_utils.parse(client.scopes)
-        }
-        if in_use:
-            logger.warning(
-                "Cannot remove scopes still in use by clients organization_id=%s scopes=%s",
-                id,
-                sorted(in_use),
-            )
-            raise ScopesInUseError(in_use)
-
-    def delete_one(self, id: UUID) -> OrganizationEntity | None:
-        with self.db.get_db_session() as session:
-            repo = session.get_repository(OrganizationRepository)
-            organization = repo.get_one_with_clients(id)
-            if organization is None:
-                return None
-            if any(client.deleted_at is None for client in organization.clients):
-                logger.warning("Cannot delete organization with active clients organization_id=%s", id)
-                raise OrganizationHasClientsError()
-            return repo.update(id, deleted_at=datetime.now(timezone.utc))
-
-    def assert_scopes_granted(self, organization_id: UUID, requested: str | None) -> None:
-        organization = self.get_one(organization_id)
-        available = organization.scopes if organization is not None else None
-        if not scope_utils.is_subset(requested, available):
-            ungranted = scope_utils.parse(requested) - scope_utils.parse(available)
-            logger.warning(
-                "Requested scopes not granted organization_id=%s missing=%s",
-                organization_id,
-                sorted(ungranted),
-            )
-            raise ScopesNotGrantedError(ungranted)
+            entity = repo.get_one(id)
+            if not entity:
+                logger.debug("Organization not found for update id=%s", id)
+                raise HTTPException(status_code=404)
+            if [client for client in entity.clients if client.deleted_at is None]:
+                logger.debug("Organization still has active clients")
+                raise HTTPException(status_code=403, detail="Organization still has active clients")
+            entity.updated_at = entity.deleted_at = datetime.now(tz=timezone.utc)
+            ret_value = Organization(**entity.to_dict())
+            session.commit()
+            return ret_value

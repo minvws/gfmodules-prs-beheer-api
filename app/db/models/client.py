@@ -1,40 +1,43 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-from uuid import UUID
+import uuid
+from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, Index, String, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.types import Uuid
+from sqlalchemy import UUID, ForeignKey
+from sqlalchemy.orm import Mapped, Relationship, mapped_column, relationship
 
-from app.db.models.base import CommonColumns
-from app.db.types.oin_type import OinType
-from app.models.oin import Oin
+from app.db.models.base import (
+    Base,
+    WithTimestamps,
+    WithUUID,
+    client_certificates,
+)
 
 if TYPE_CHECKING:
+    from app.db.models.certificate import CertificateEntity
     from app.db.models.organization import OrganizationEntity
+    from app.db.models.organization_personal_id_type import ClientPersonalIdTypeEntity
 
 
-class ClientEntity(CommonColumns):
+class ClientEntity(Base, WithUUID, WithTimestamps):
     __tablename__ = "clients"
-    __table_args__ = (
-        Index(
-            "uq_clients_org_oin_cn_active",
-            "organization_id",
-            "oin",
-            "common_name",
-            unique=True,
-            sqlite_where=text("deleted_at IS NULL"),
-            postgresql_where=text("deleted_at IS NULL"),
-        ),
+    __table_args__ = ({"schema": "admin"},)
+
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
+
+    organization: Mapped[OrganizationEntity] = Relationship(back_populates="clients")
+
+    certificates: Mapped[list[CertificateEntity]] = Relationship(secondary=client_certificates)
+
+    request_personal_id_types: Mapped[list[ClientPersonalIdTypeEntity]] = relationship(
+        back_populates="client", cascade="all, delete-orphan"
     )
 
-    organization_id: Mapped[UUID] = mapped_column("organization_id", Uuid, ForeignKey("organizations.id"))
-    oin: Mapped[Oin] = mapped_column("oin", OinType)
-    common_name: Mapped[str] = mapped_column("common_name", String)
-
-    organization: Mapped[OrganizationEntity] = relationship(back_populates="clients", lazy="raise")
-
-    @property
-    def organization_name(self) -> str:
-        return self.organization.name
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **WithUUID.to_dict(self),
+            **WithTimestamps.to_dict(self),
+            "organization_id": self.organization_id,
+            "certificates": [c.id for c in self.certificates],
+            "request_personal_id_types": [ra.personal_id_type.name for ra in self.request_personal_id_types],
+        }

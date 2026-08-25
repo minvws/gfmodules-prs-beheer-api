@@ -1,87 +1,134 @@
+import uuid
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from pydantic import ValidationError
 
-from app.models.client import Client, ClientCreate, ClientQueryParams, ClientResolveRequest, ClientUpdate
+from app.db.models.certificate import CertificateEntity
+from app.db.models.client import ClientEntity
+from app.db.models.organization_personal_id_type import ClientPersonalIdTypeEntity
+from app.db.models.personal_id_type import PersonalIdTypeEntity
+from app.enums.personal_id_type import PersonalIdType
+from app.models.client import (
+    Client,
+    ClientCreate,
+    ClientQueryParams,
+    ClientUpdate,
+    ResolveRequest,
+)
 from app.models.oin import Oin
 from tests.conftest import TEST_OIN
 
 
 def test_create_should_succeed() -> None:
-    model = ClientCreate(oin=TEST_OIN, common_name="Test Client")
-    assert model.oin == TEST_OIN
-    assert model.common_name == "Test Client"
-    assert model.scopes is None
+    certificate_uuid = uuid.uuid4()
+    model = ClientCreate(request_personal_id_types=[PersonalIdType.OPRF], certificates=[certificate_uuid])
+    assert model.request_personal_id_types == [PersonalIdType.OPRF]
+    assert model.certificates == [certificate_uuid]
 
 
-def test_create_with_scopes_should_succeed() -> None:
-    model = ClientCreate(oin=TEST_OIN, common_name="Test Client", scopes="read")
-    assert model.scopes == "read"
+def test_update_should_succeed() -> None:
+    certificate_uuid = uuid.uuid4()
+    model = ClientUpdate(
+        request_personal_id_types=[PersonalIdType.OPRF], certificates=[certificate_uuid], deleted=False
+    )
+    assert model.request_personal_id_types == [PersonalIdType.OPRF]
+    assert model.certificates == [certificate_uuid]
+    assert model.deleted == False
+
+
+def test_query_params() -> None:
+    model = ClientQueryParams(include_deleted=False)
+    assert model.include_deleted == False
 
 
 def test_response_model_from_entity() -> None:
-    class _Entity:
-        id = uuid4()
-        organization_id = uuid4()
-        oin = TEST_OIN
-        common_name = "Test Client"
-        scopes = None
-        created_at = datetime.now(timezone.utc)
-        deleted_at = None
+    entity = ClientEntity(
+        id=uuid4(),
+        organization_id=uuid4(),
+        certificates=[CertificateEntity(id=uuid4())],
+        request_personal_id_types=[
+            ClientPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
+        ],
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        deleted_at=None,
+    )
+    model = Client.model_validate(entity.to_dict())
+    assert model.id == entity.id
 
-    model = Client.model_validate(_Entity())
-    assert model.id == _Entity.id
+
+def test_response_model_from_entity_deleted() -> None:
+    entity = ClientEntity(
+        id=uuid4(),
+        organization_id=uuid4(),
+        certificates=[CertificateEntity(id=uuid4())],
+        request_personal_id_types=[
+            ClientPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
+        ],
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+        deleted_at=datetime.now(timezone.utc),
+    )
+    model = Client.model_validate(entity.to_dict())
+    assert model.id == entity.id
 
 
-def test_create_missing_oin_should_raise() -> None:
+def test_create_missing_should_raise() -> None:
     with pytest.raises(ValidationError):
-        ClientCreate(common_name="Test Client")  # type: ignore[call-arg]
-
-
-def test_create_missing_common_name_should_raise() -> None:
-    with pytest.raises(ValidationError):
-        ClientCreate(oin=TEST_OIN)  # type: ignore[call-arg]
-
-
-def test_update_is_partial_all_fields_optional() -> None:
-    model = ClientUpdate()
-    assert model.oin is None
-    assert model.common_name is None
-    assert model.scopes is None
-
-
-def test_update_only_tracks_supplied_fields() -> None:
-    model = ClientUpdate(common_name="New Name")
-    assert model.model_dump(exclude_unset=True) == {"common_name": "New Name"}
-
-
-def test_update_can_set_oin_and_scopes() -> None:
-    model = ClientUpdate(oin=TEST_OIN, scopes="read")
-    assert model.oin == TEST_OIN
-    assert model.scopes == "read"
-
-
-def test_query_params_all_optional_and_track_supplied_only() -> None:
-    assert ClientQueryParams().model_dump(exclude_unset=True) == {}
-    params = ClientQueryParams(common_name="CN-1", scopes="read")
-    assert params.model_dump(exclude_unset=True) == {"common_name": "CN-1", "scopes": "read"}
+        ClientCreate()  # type: ignore[call-arg]
 
 
 def test_resolve_request_should_succeed() -> None:
-    model = ClientResolveRequest(
-        client_organization_id=TEST_OIN,
-        client_common_name="Test Client",
-        organization_id=Oin("00000099000000001000"),
+    client_id = uuid.uuid4()
+    model = ResolveRequest(
+        client_id=client_id,
+        organization_external_id=TEST_OIN,
+        certificate_domain="domain",
+        certificate_organization_identifier="cert_org_id",
     )
-    assert model.client_organization_id == TEST_OIN
-    assert model.organization_id == Oin("00000099000000001000")
+    assert model.client_id == client_id
+    assert model.organization_external_id == TEST_OIN
+    assert model.certificate_domain == "domain"
+    assert model.certificate_organization_identifier == "cert_org_id"
 
 
-def test_resolve_request_missing_org_id_should_raise() -> None:
-    with pytest.raises(ValidationError):
-        ClientResolveRequest(  # type: ignore[call-arg]
-            client_organization_id=TEST_OIN,
-            client_common_name="Test Client",
+def test_resolve_request_missing_client_id_should_succeed() -> None:
+    model = ResolveRequest(
+        client_id=None,
+        organization_external_id=TEST_OIN,
+        certificate_domain="domain",
+        certificate_organization_identifier="cert_org_id",
+    )
+    assert model.client_id == None
+    assert model.organization_external_id == TEST_OIN
+    assert model.certificate_domain == "domain"
+    assert model.certificate_organization_identifier == "cert_org_id"
+
+
+@pytest.mark.parametrize(
+    [
+        "client_id",
+        "organization_external_id",
+        "certificate_domain",
+        "certificate_organization_identifier",
+    ],
+    [
+        (uuid.uuid4(), None, "domain", "cert_org_id"),
+    ],
+)
+def test_resolve_request_missing_fields_should_raise(
+    client_id: UUID,
+    organization_external_id: Oin,
+    certificate_domain: str,
+    certificate_organization_identifier: str,
+) -> None:
+    with pytest.raises(ValidationError) as e:
+        ResolveRequest(
+            client_id=client_id,
+            organization_external_id=organization_external_id,
+            certificate_domain=certificate_domain,
+            certificate_organization_identifier=certificate_organization_identifier,
         )
+    assert e.value.error_count() == 1

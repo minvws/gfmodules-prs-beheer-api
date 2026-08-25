@@ -14,6 +14,8 @@ services:
       - ./secrets:/src/secrets
     ports:
       - 8512:8512
+    networks:
+      - prs
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8512/health"]
       timeout: 10s
@@ -35,3 +37,7 @@ services:
       start_interval: 1s
     ports:
       - 5432:5432
+
+networks:
+  prs:
+    name: prs
