@@ -12,7 +12,7 @@ else
 fi
 
 echo "Migrating"
-#python -m tools.migrate_db
+python -m tools.migrate_db
 
 echo "Start main process"
 python -m app.main
