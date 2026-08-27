@@ -8,6 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from app.application import request_validation_exception_handler
 from app.config import ConfigDatabase
@@ -34,7 +35,7 @@ FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 @pytest.fixture()
 def database() -> Generator[Database, Any, None]:
-    config_database = ConfigDatabase(dsn="sqlite:///:memory:", retry_backoff=[])
+    config_database = ConfigDatabase(dsn=SecretStr("sqlite:///:memory:"), retry_backoff=[])
     db = Database(config_database=config_database)
     db.generate_tables()
     yield db
