@@ -2,6 +2,7 @@ import logging
 from typing import Annotated, Any
 from uuid import UUID
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.exc import IntegrityError
@@ -56,11 +57,11 @@ def register(
         result = service.create_one(organization_id=organization_id, **data.model_dump())
     except ScopesNotGrantedError as error:
         logger.warning("Client create scopes not granted organization_id=%s: %s", organization_id, error)
-        Log.event(
+        gflog.emit(
             logger,
             Log.ONBOARDING_VALIDATION_FAILED,
             "validation failed for supplied registration data",
-            error_reason=str(error),
+            fields={"error_reason": str(error)},
         )
         raise HTTPException(status_code=422, detail=str(error))
     except IntegrityError:
@@ -74,14 +75,16 @@ def register(
             status_code=409,
             detail="A client with this oin / common_name is already registered for this organization.",
         )
-    Log.event(
+    gflog.emit(
         logger,
         Log.CLIENT_REGISTERED,
         "client registered for organization",
-        organisatie_oin=_organization_oin(organization_service, organization_id),
-        handelende_oin=str(data.oin),
-        common_name=data.common_name,
-        scopes=data.scopes,
+        fields={
+            "organisatie_oin": _organization_oin(organization_service, organization_id),
+            "handelende_oin": str(data.oin),
+            "common_name": data.common_name,
+            "scopes": data.scopes,
+        },
     )
     return result
 
@@ -155,24 +158,26 @@ def update(
             id,
             error,
         )
-        Log.event(
+        gflog.emit(
             logger,
             Log.ONBOARDING_VALIDATION_FAILED,
             "validation failed for supplied registration data",
-            error_reason=str(error),
+            fields={"error_reason": str(error)},
         )
         raise HTTPException(status_code=422, detail=str(error))
     if result is None:
         logger.debug("Client not found for update organization_id=%s client_id=%s", organization_id, id)
         raise HTTPException(status_code=404)
     if "scopes" in fields:
-        Log.event(
+        gflog.emit(
             logger,
             Log.SCOPES_CHANGED,
             "client scopes changed",
-            organisatie_oin=_organization_oin(organization_service, organization_id),
-            handelende_oin=str(result.oin),
-            changed_scopes=fields["scopes"],
+            fields={
+                "organisatie_oin": _organization_oin(organization_service, organization_id),
+                "handelende_oin": str(result.oin),
+                "changed_scopes": fields["scopes"],
+            },
         )
     return result
 
@@ -192,11 +197,13 @@ def delete(
     if result is None:
         logger.debug("Client not found for delete organization_id=%s client_id=%s", organization_id, id)
         raise HTTPException(status_code=404)
-    Log.event(
+    gflog.emit(
         logger,
         Log.CLIENT_WITHDRAWN,
         "client access withdrawn",
-        organisatie_oin=_organization_oin(organization_service, organization_id),
-        handelende_oin=str(result.oin),
+        fields={
+            "organisatie_oin": _organization_oin(organization_service, organization_id),
+            "handelende_oin": str(result.oin),
+        },
     )
     return Response(status_code=204)

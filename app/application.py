@@ -1,19 +1,24 @@
+import json
 import logging
-from logging.config import dictConfig
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
+import gfmodules.logging as gflog
 import uvicorn
 from fastapi import FastAPI, Request, Security
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import APIKeyHeader
+from gfmodules.logging.exceptions import log_unhandled_exception
+from gfmodules.logging.middleware import RequestContextMiddleware, restore_request_context
 
 from app import container
-from app.config import get_config
-from app.logging.config_builder import LogConfigBuilder
-from app.logging.events import Log
-from app.logging.middleware import RequestContextMiddleware, restore_request_context
+from app.config import _ENVIRONMENT_CONFIG_PATH_NAME, _PATH, get_config
+from app.logging.events import ACT_CN, Log
 from app.middleware.stats import StatsdMiddleware
 from app.routers.client import router as client_router
 from app.routers.default import router as default_router
@@ -40,23 +45,18 @@ async def request_validation_exception_handler(
         body,
         exc.errors(),
     )
-    Log.event(
+    gflog.emit(
         logger,
         Log.ONBOARDING_VALIDATION_FAILED,
         "validation failed for supplied registration data",
-        error_reason=_error_reason(exc),
-        endpoint=request.url.path,
+        fields={"error_reason": _error_reason(exc), "endpoint": request.url.path},
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
 
 @restore_request_context
 def _unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error(
-        "Unhandled exception",
-        exc_info=exc,
-        extra={"exception_type": type(exc).__name__},
-    )
+    log_unhandled_exception(logger, request, exc)
     return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
@@ -95,24 +95,57 @@ def run() -> None:
     uvicorn.run("app.application:create_fastapi_app", **get_uvicorn_params())
 
 
-def create_fastapi_app() -> FastAPI:
+def application_init() -> None:
     setup_logging()
-    fastapi = setup_fastapi()
+    gflog.install_excepthook(logger)
+    gflog.install_signal_handlers()
+
+
+def create_fastapi_app() -> FastAPI:
+    application_init()
+    try:
+        fastapi = setup_fastapi()
+    except Exception as exc:
+        gflog.emit(
+            logger,
+            Log.SYS_UNHANDLED_EXCEPTION,
+            "Unhandled exception during application startup",
+            fields={"exception_type": type(exc).__name__},
+            exc_info=exc,
+        )
+        raise
 
     return fastapi
 
 
 def setup_logging() -> None:
     config = get_config()
-    loglevel = config.app.loglevel.upper()
-    if loglevel not in logging.getLevelNamesMapping():
-        raise ValueError(f"Invalid loglevel {loglevel}")
+    gflog.configure(
+        config=config.logging,
+        loglevel=config.app.loglevel,
+        catalogue=Log,
+        extra_context_fields=(ACT_CN,),
+    )
 
-    log_config = LogConfigBuilder(
-        loglevel=loglevel,
-        logging_config=config.logging,
-    ).build()
-    dictConfig(log_config)
+
+def _read_version() -> str:
+    path = Path(__file__).parent.parent / "version.json"
+    try:
+        with open(path, "r") as fh:
+            data = json.load(fh)
+            return str(data.get("version", "unknown"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return "unknown"
+
+
+@asynccontextmanager
+async def _lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async with gflog.lifespan_logging(
+        logger,
+        version=_read_version(),
+        config_path=os.environ.get(_ENVIRONMENT_CONFIG_PATH_NAME, _PATH),
+    ):
+        yield
 
 
 def setup_fastapi() -> FastAPI:
@@ -124,18 +157,14 @@ def setup_fastapi() -> FastAPI:
             redoc_url=config.uvicorn.redoc_url,
             title="PRS Beheer API",
             root_path=config.uvicorn.root_path,
+            lifespan=_lifespan,
             dependencies=api_key_headers(config.uvicorn.document_gf_headers),
         )
         if config.uvicorn.swagger_enabled
-        else FastAPI(docs_url=None, redoc_url=None)
+        else FastAPI(docs_url=None, redoc_url=None, lifespan=_lifespan)
     )
 
     container.configure()
-
-    fastapi.add_middleware(
-        RequestContextMiddleware,
-        correlation_id_expected=config.logging.correlation_id_expected,
-    )
 
     routers = [default_router, health_router, organization_router, client_router, resolve_router]
 
@@ -147,5 +176,11 @@ def setup_fastapi() -> FastAPI:
 
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")
+
+    fastapi.add_middleware(
+        RequestContextMiddleware,
+        correlation_id_expected=config.logging.correlation_id_expected,
+        trust_forwarded_for=config.logging.trust_forwarded_for,
+    )
 
     return fastapi
