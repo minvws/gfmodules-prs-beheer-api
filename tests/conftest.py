@@ -4,10 +4,13 @@ from typing import Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+import gfmodules.logging as gflog
 import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from gfmodules.logging import ConfigLogging
+from gfmodules.logging.testing import reset_for_tests
 from pydantic import SecretStr
 
 from app.application import request_validation_exception_handler
@@ -18,6 +21,7 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
+from app.logging.events import ACT_CN, Log
 from app.models.oin import Oin
 from app.routers.client import router as client_router
 from app.routers.organization import router as organization_router
@@ -31,6 +35,21 @@ TEST_ORG_NAME = "Test Organization"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
 FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def logging_catalogue() -> Generator[None, Any, None]:
+    gflog.configure(
+        config=ConfigLogging(debug_logs_in_console=True, access_logs=True),
+        loglevel="DEBUG",
+        catalogue=Log,
+        extra_context_fields=(ACT_CN,),
+        strict_fields=True,
+    )
+    try:
+        yield
+    finally:
+        reset_for_tests()
 
 
 @pytest.fixture()

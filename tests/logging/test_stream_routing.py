@@ -1,132 +1,135 @@
-"""Verifies per-field stream routing (APP == stroom 2, SIEM == stroom 3) for the PRS-OB events."""
-
-import io
-import json
 import logging
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from contextlib import ExitStack
 from typing import Any
 
+import gfmodules.logging as gflog
 import pytest
+from gfmodules.logging import LogEvent, LoggingStreams, bind_context
+from gfmodules.logging.testing import assert_fields_absent, capture_stream
 
-from app.logging.context import correlation_id_var, endpoint_var, ip_var, method_var, request_id_var
 from app.logging.events import Log
-from app.logging.filters import AppFilter, LoggingStreams, SiemFilter
-from app.logging.formatter import JsonFormatter
+
+_LOGGER_NAME = "app.test_stream_routing"
+_ORGANISATIE_OIN = "00000099000000001000"
+_HANDELENDE_OIN = "00000099000000002000"
+
+Routed = dict[LoggingStreams, list[dict[str, Any]]]
+Route = Callable[..., Routed]
 
 
 @pytest.fixture
-def streams() -> Iterator[tuple[logging.Logger, io.StringIO, io.StringIO]]:
-    app_buf, siem_buf = io.StringIO(), io.StringIO()
+def route() -> Iterator[Route]:
+    logger = logging.getLogger(_LOGGER_NAME)
 
-    app_handler = logging.StreamHandler(app_buf)
-    app_handler.addFilter(AppFilter())
-    app_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.APP, stream_id="app"))
+    def _route(event: LogEvent, message: str = "event", **fields: Any) -> Routed:
+        with ExitStack() as stack:
+            routed: Routed = {
+                stream: stack.enter_context(capture_stream(stream, _LOGGER_NAME)) for stream in LoggingStreams
+            }
+            gflog.emit(logger, event, message, fields={**fields})
+        return routed
 
-    siem_handler = logging.StreamHandler(siem_buf)
-    siem_handler.addFilter(SiemFilter())
-    siem_handler.setFormatter(JsonFormatter(include_traces=False, stream=LoggingStreams.SIEM, stream_id="siem"))
-
-    logger = logging.getLogger("app.test_stream_routing")
-    logger.setLevel(logging.DEBUG)
-    logger.handlers = [app_handler, siem_handler]
-    logger.propagate = False
-
-    tokens = [
-        request_id_var.set("req-1"),
-        ip_var.set("10.0.0.1"),
-        endpoint_var.set("/organizations"),
-        method_var.set("POST"),
-        correlation_id_var.set("corr-1"),
-    ]
-    try:
-        yield logger, app_buf, siem_buf
-    finally:
-        logger.handlers = []
-        request_id_var.reset(tokens[0])
-        ip_var.reset(tokens[1])
-        endpoint_var.reset(tokens[2])
-        method_var.reset(tokens[3])
-        correlation_id_var.reset(tokens[4])
+    with bind_context(
+        {
+            "request_id": "req-1",
+            "ip": "10.0.0.1",
+            "endpoint": "/organizations",
+            "method": "POST",
+            "correlation_id": "corr-1",
+            "gf-act-cn": "acting-client",
+        }
+    ):
+        yield _route
 
 
-def _records(buf: io.StringIO) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in buf.getvalue().splitlines()]
+class TestOrganizationRegistered:
+    @pytest.fixture
+    def routed(self, route: Route) -> Routed:
+        return route(
+            Log.ORGANIZATION_REGISTERED,
+            "registered",
+            organisatie_oin=_ORGANISATIE_OIN,
+            bevoegdheden="read write",
+        )
+
+    def test_both_streams_receive_the_organisatie_oin(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.APP][0]["organisatie_oin"] == _ORGANISATIE_OIN
+        assert routed[LoggingStreams.SIEM][0]["organisatie_oin"] == _ORGANISATIE_OIN
+
+    def test_siem_does_not_receive_the_bevoegdheden(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.APP][0]["bevoegdheden"] == "read write"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "bevoegdheden")
+
+    def test_public_inspect_receives_nothing(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.PUBLIC_INSPECT] == []
 
 
-def _messages(buf: io.StringIO) -> list[dict[str, Any]]:
-    return [record["message"] for record in _records(buf)]
+class TestClientRegistered:
+    @pytest.fixture
+    def routed(self, route: Route) -> Routed:
+        return route(
+            Log.CLIENT_REGISTERED,
+            "registered",
+            organisatie_oin=_ORGANISATIE_OIN,
+            handelende_oin=_HANDELENDE_OIN,
+            common_name="client.example.com",
+            scopes="read",
+        )
+
+    def test_siem_does_not_receive_the_common_name(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.APP][0]["common_name"] == "client.example.com"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "common_name")
+
+    def test_both_streams_receive_the_oins_and_scopes(self, routed: Routed) -> None:
+        for message in (routed[LoggingStreams.APP][0], routed[LoggingStreams.SIEM][0]):
+            assert message["organisatie_oin"] == _ORGANISATIE_OIN
+            assert message["handelende_oin"] == _HANDELENDE_OIN
+            assert message["scopes"] == "read"
 
 
-def test_records_carry_stream_id(streams: tuple[logging.Logger, io.StringIO, io.StringIO]) -> None:
-    logger, app_buf, siem_buf = streams
-    Log.event(logger, Log.ORGANIZATION_REGISTERED, "registered", organisatie_oin="00000099000000001000")
+class TestOnboardingValidationFailed:
+    @pytest.fixture
+    def routed(self, route: Route) -> Routed:
+        return route(
+            Log.ONBOARDING_VALIDATION_FAILED,
+            "validation failed",
+            error_reason="register_id: invalid OIN",
+            endpoint="/organizations",
+        )
 
-    assert _records(app_buf)[0]["stream_id"] == "app"
-    assert _records(siem_buf)[0]["stream_id"] == "siem"
+    def test_siem_does_not_receive_the_endpoint(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.APP][0]["endpoint"] == "/organizations"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "endpoint")
 
-
-def test_organization_registered_withholds_bevoegdheden_from_siem(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO],
-) -> None:
-    logger, app_buf, siem_buf = streams
-    Log.event(
-        logger,
-        Log.ORGANIZATION_REGISTERED,
-        "registered",
-        organisatie_oin="00000099000000001000",
-        bevoegdheden="read write",
-    )
-
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
-
-    assert app_msg["bevoegdheden"] == "read write"
-    assert "bevoegdheden" not in siem_msg  # not in SIEM allow-list for PRS-OB-001
-    for msg in (app_msg, siem_msg):
-        assert msg["organisatie_oin"] == "00000099000000001000"
+    def test_both_streams_receive_the_error_reason(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.APP][0]["error_reason"] == "register_id: invalid OIN"
+        assert routed[LoggingStreams.SIEM][0]["error_reason"] == "register_id: invalid OIN"
 
 
-def test_client_registered_withholds_common_name_from_siem(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO],
-) -> None:
-    logger, app_buf, siem_buf = streams
-    Log.event(
-        logger,
-        Log.CLIENT_REGISTERED,
-        "registered",
-        organisatie_oin="00000099000000001000",
-        handelende_oin="00000099000000002000",
-        common_name="client.example.com",
-        scopes="read",
-    )
+class TestAccessRequest:
+    @pytest.fixture
+    def routed(self, route: Route) -> Routed:
+        return route(Log.ACCESS_REQUEST, "access", status_code=201, duration_ms=5)
 
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
+    def test_reaches_the_app_stream_only(self, routed: Routed) -> None:
+        assert routed[LoggingStreams.SIEM] == []
+        assert routed[LoggingStreams.PUBLIC_INSPECT] == []
 
-    assert app_msg["common_name"] == "client.example.com"
-    assert "common_name" not in siem_msg  # not in SIEM allow-list for PRS-OB-003
-    for msg in (app_msg, siem_msg):
-        assert msg["organisatie_oin"] == "00000099000000001000"
-        assert msg["handelende_oin"] == "00000099000000002000"
-        assert msg["scopes"] == "read"
+    def test_carries_the_acting_client_and_the_response(self, routed: Routed) -> None:
+        message = routed[LoggingStreams.APP][0]
+
+        assert message["gf-act-cn"] == "acting-client"
+        assert message["status_code"] == 201
+        assert message["duration_ms"] == 5
 
 
-def test_validation_failed_withholds_endpoint_from_siem(
-    streams: tuple[logging.Logger, io.StringIO, io.StringIO],
-) -> None:
-    logger, app_buf, siem_buf = streams
-    Log.event(
-        logger,
-        Log.ONBOARDING_VALIDATION_FAILED,
-        "validation failed",
-        error_reason="register_id: invalid OIN",
-        endpoint="/organizations",
-    )
+class TestCorrelationMetadata:
+    def test_is_retained_in_every_routed_stream(self, route: Route) -> None:
+        routed = route(Log.ORGANIZATION_REGISTERED, "registered", organisatie_oin=_ORGANISATIE_OIN)
 
-    app_msg = _messages(app_buf)[0]
-    siem_msg = _messages(siem_buf)[0]
-
-    assert app_msg["endpoint"] == "/organizations"
-    assert "endpoint" not in siem_msg  # not in SIEM allow-list for PRS-OB-006
-    for msg in (app_msg, siem_msg):
-        assert msg["error_reason"] == "register_id: invalid OIN"
+        for stream in (LoggingStreams.APP, LoggingStreams.SIEM):
+            message = routed[stream][0]
+            assert message["request_id"] == "req-1"
+            assert message["correlation_id"] == "corr-1"
+            assert message["ip"] == "10.0.0.1"

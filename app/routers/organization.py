@@ -2,6 +2,7 @@ import logging
 from typing import Annotated, Any
 from uuid import UUID
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy.exc import IntegrityError
@@ -28,12 +29,11 @@ def register(
     except IntegrityError:
         logger.warning("Organization create conflict for register_id=%s", data.register_id)
         raise HTTPException(status_code=409, detail=_register_id_conflict_message)
-    Log.event(
+    gflog.emit(
         logger,
         Log.ORGANIZATION_REGISTERED,
         "organization registered",
-        organisatie_oin=str(data.register_id),
-        bevoegdheden=data.scopes,
+        fields={"organisatie_oin": str(data.register_id), "bevoegdheden": data.scopes},
     )
     return result
 
@@ -89,12 +89,11 @@ def update(
     if result is None:
         raise HTTPException(status_code=404)
     if fields["scopes"] != current.scopes:
-        Log.event(
+        gflog.emit(
             logger,
             Log.SCOPES_CHANGED,
             "organization scopes changed",
-            organisatie_oin=str(result.register_id),
-            changed_scopes=fields["scopes"],
+            fields={"organisatie_oin": str(result.register_id), "changed_scopes": fields["scopes"]},
         )
     return result
 
@@ -113,10 +112,10 @@ def delete(
     if result is None:
         logger.debug("Organization not found for delete id=%s", id)
         raise HTTPException(status_code=404)
-    Log.event(
+    gflog.emit(
         logger,
         Log.ORGANIZATION_WITHDRAWN,
         "organization registration withdrawn",
-        organisatie_oin=str(result.register_id),
+        fields={"organisatie_oin": str(result.register_id)},
     )
     return Response(status_code=204)
