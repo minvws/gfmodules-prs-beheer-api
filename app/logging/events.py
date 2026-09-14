@@ -1,36 +1,16 @@
 import logging
 from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any
+from typing import ClassVar
 
-from app.logging.filters import LoggingStreams
+from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
 
-
-@dataclass(frozen=True)
-class LogEvent:
-    event_id: str
-    level: int
-    streams: tuple[LoggingStreams, ...]
-    # Per-stream allow-list of field names. APP == "stroom 2", SIEM == "stroom 3".
-    # When empty, no per-field routing is applied and every field is sent to all
-    # streams in ``streams``.
-    fields: Mapping[LoggingStreams, tuple[str, ...]] = field(default_factory=dict)
+_Base = DefaultEventCatalogue
 
 
-ACCESS_EVENT_ID = {
-    ("POST", "/organizations"): "260700",
-    ("PUT", "/organizations/{id}"): "260701",
-    ("DELETE", "/organizations/{id}"): "260702",
-    ("POST", "/organizations/{organization_id}/clients"): "260703",
-    ("PUT", "/organizations/{organization_id}/clients/{id}"): "260704",
-    ("DELETE", "/organizations/{organization_id}/clients/{id}"): "260705",
-}
-
-
-class Log:
+class Log(_Base):
     # Onboarding en Beheer (PRS-OB) audit events for the beheer API.
     # See https://github.com/minvws/gfmodules-coordination-private/issues/1040
     # The ``fields`` map mirrors the "Stroom 2" (APP) / "Stroom 3" (SIEM) columns.
@@ -91,37 +71,17 @@ class Log:
             _SIEM: ("error_reason",),
         },
     )
-    SYS_MISSING_CORRELATION_ID = LogEvent(  # PRS-SYS-007
-        "270407",
-        logging.ERROR,
-        (_APP, _SIEM),
-        {
-            _APP: ("endpoint", "method"),
-            _SIEM: ("endpoint", "method"),
-        },
-    )
-    ACCESS_REQUEST = LogEvent(  # NVI-AUTH-101
-        "260450",
-        logging.INFO,
-        (_APP,),
-        {_APP: ("endpoint", "method", "gf-act-cn")},
-    )
+    SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("270401")  # PRS-SYS-001
+    SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("270402")  # PRS-SYS-002
+    SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("270402")  # PRS-SYS-002
+    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404")  # PRS-SYS-004
+    SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("270407")  # PRS-SYS-007
 
-    @staticmethod
-    def event(
-        logger: logging.Logger,
-        event: LogEvent,
-        message: str,
-        *,
-        event_id: str | None = None,
-        exc_info: Any = None,
-        **fields: Any,
-    ) -> None:
-        extra: dict[str, Any] = {
-            "event_id": event_id if event_id else event.event_id,
-            "stream": list(event.streams),
-        }
-        if event.fields:
-            extra["field_streams"] = event.fields
-        extra.update(fields)
-        logger.log(event.level, message, extra=extra, exc_info=exc_info)
+    access_event_id: ClassVar[Mapping[tuple[str, str], str]] = {
+        ("POST", "/organizations"): "260700",
+        ("PUT", "/organizations/{id}"): "260701",
+        ("DELETE", "/organizations/{id}"): "260702",
+        ("POST", "/organizations/{organization_id}/clients"): "260703",
+        ("PUT", "/organizations/{organization_id}/clients/{id}"): "260704",
+        ("DELETE", "/organizations/{organization_id}/clients/{id}"): "260705",
+    }
