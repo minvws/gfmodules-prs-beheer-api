@@ -4,10 +4,13 @@ from typing import Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
+import gfmodules.logging as gflog
 import pytest
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.testclient import TestClient
+from gfmodules.logging import ConfigLogging
+from gfmodules.logging.testing import reset_for_tests
 from pydantic import SecretStr
 from sqlalchemy import text
 
@@ -24,6 +27,7 @@ from app.db.repository.organization import OrganizationRepository
 from app.db.repository.personal_id_type import PersonalIdTypeRepository
 from app.db.session import DbSession
 from app.enums.personal_id_type import PersonalIdType
+from app.logging.events import Log
 from app.models.client import Client
 from app.models.oin import Oin
 from app.models.organization import Organization
@@ -45,6 +49,20 @@ DEFAULT_RECEIVE_PERSONAL_ID_TYPES = [PersonalIdType.OPRF]
 DEFAULT_REQUEST_PERSONAL_ID_TYPES = [PersonalIdType.REVERSIBLE_PSEUDONYM]
 CERTIFICATE_ID = uuid4()
 DEFAULT_CERTIFICATES = [CERTIFICATE_ID]
+
+
+@pytest.fixture(autouse=True)
+def logging_catalogue() -> Generator[None, Any, None]:
+    gflog.configure(
+        config=ConfigLogging(console_streams=["debug"], access_logs=True),
+        loglevel="DEBUG",
+        catalogue=Log,
+        strict_fields=True,
+    )
+    try:
+        yield
+    finally:
+        reset_for_tests()
 
 
 @pytest.fixture()
