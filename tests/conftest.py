@@ -22,10 +22,13 @@ from app.db.models.client import ClientEntity
 from app.db.models.client_personal_id_type import ClientPersonalIdTypeEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.models.personal_id_type import PersonalIdTypeEntity
+from app.db.models.scope import ScopeEntity
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.personal_id_type import PersonalIdTypeRepository
+from app.db.repository.scope import ScopeRepository
 from app.db.session import DbSession
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.logging.events import Log
 from app.models.client import Client
@@ -45,6 +48,7 @@ TEST_ORG_NAME = "Test Organization"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
 FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+DEFAULT_AUTHORIZATION_SCOPES = [AuthorizationScope.ADMINISTRATION]
 DEFAULT_RECEIVE_PERSONAL_ID_TYPES = [PersonalIdType.OPRF]
 DEFAULT_REQUEST_PERSONAL_ID_TYPES = [PersonalIdType.REVERSIBLE_PSEUDONYM]
 CERTIFICATE_ID = uuid4()
@@ -77,6 +81,8 @@ def database() -> Generator[Database, Any, None]:
     with db.get_db_session(commit=True) as session:
         session.add(PersonalIdTypeEntity(name=PersonalIdType.OPRF))
         session.add(PersonalIdTypeEntity(name=PersonalIdType.REVERSIBLE_PSEUDONYM))
+        for scope in AuthorizationScope:
+            session.add(ScopeEntity(name=scope.name))
 
     yield db
     db.engine.dispose()
@@ -101,6 +107,11 @@ def client_repository(db_session: DbSession) -> ClientRepository:
 @pytest.fixture()
 def personal_id_type_repository(db_session: DbSession) -> PersonalIdTypeRepository:
     return PersonalIdTypeRepository(db_session=db_session)
+
+
+@pytest.fixture()
+def scope_repository(db_session: DbSession) -> ScopeRepository:
+    return ScopeRepository(db_session=db_session)
 
 
 @pytest.fixture()
@@ -147,12 +158,16 @@ def persisted_client_entity(db_session: DbSession, client_entity: ClientEntity) 
 
 @pytest.fixture()
 def persisted_organization(
-    db_session: DbSession, personal_id_type_repository: PersonalIdTypeRepository
+    db_session: DbSession,
+    personal_id_type_repository: PersonalIdTypeRepository,
+    scope_repository: ScopeRepository,
 ) -> OrganizationEntity:
     personal_ids = personal_id_type_repository.get_many([PersonalIdType.OPRF])
+    scopes = scope_repository.get_many([AuthorizationScope.ADMINISTRATION])
     org = OrganizationEntity(
         external_id=TEST_EXTERNAL_ID,
         name=TEST_ORG_NAME,
+        scopes=list(scopes),
         receive_personal_id_types=list(personal_ids),
         request_personal_id_types=list(personal_ids),
     )
@@ -188,6 +203,7 @@ def make_organization_entity(
     id: UUID | None = None,
     external_id: Oin = VALID_OIN,
     name: str = TEST_ORG_NAME,
+    scopes: list[AuthorizationScope] = DEFAULT_AUTHORIZATION_SCOPES,
     receive_personal_id_types: list[PersonalIdType] = DEFAULT_RECEIVE_PERSONAL_ID_TYPES,
     request_personal_id_types: list[PersonalIdType] = DEFAULT_REQUEST_PERSONAL_ID_TYPES,
     created_at: datetime | None = None,
@@ -198,6 +214,7 @@ def make_organization_entity(
         id=id or uuid4(),
         external_id=external_id,
         name=name,
+        scopes=scopes,
         receive_personal_id_types=receive_personal_id_types,
         request_personal_id_types=request_personal_id_types,
         created_at=created_at or FIXED_CREATED_AT,
@@ -210,6 +227,7 @@ def make_client_entity(
     *,
     id: UUID | None = None,
     organization_id: UUID | None = None,
+    scopes: list[AuthorizationScope] = DEFAULT_AUTHORIZATION_SCOPES,
     request_personal_id_types: list[PersonalIdType] = DEFAULT_REQUEST_PERSONAL_ID_TYPES,
     certificates: list[UUID] = DEFAULT_CERTIFICATES,
     created_at: datetime | None = None,
@@ -219,6 +237,7 @@ def make_client_entity(
     return Client(
         id=id or uuid4(),
         organization_id=organization_id or uuid4(),
+        scopes=scopes,
         request_personal_id_types=request_personal_id_types,
         certificates=certificates,
         created_at=created_at or FIXED_CREATED_AT,

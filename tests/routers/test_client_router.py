@@ -4,6 +4,7 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.client import ClientCreate, ClientQueryParams, ClientUpdate
 from tests.conftest import CERTIFICATE_ID, FIXED_CREATED_AT, make_client_entity
@@ -32,6 +33,7 @@ def test_register_returns_201(
     mock_client_service.create_one.return_value = entity
 
     body = {
+        "scopes": ["prs:administration"],
         "request_personal_id_types": ["oprf"],
         "certificates": [str(CERTIFICATE_ID)],
     }
@@ -45,12 +47,14 @@ def test_register_returns_201(
         "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "certificates": [str(CERTIFICATE_ID)],
+        "scopes": ["prs:administration"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
 
     mock_client_service.create_one.assert_called_once_with(
         UUID(ORG_ID),
         ClientCreate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[CERTIFICATE_ID],
         ),
@@ -139,6 +143,7 @@ def test_update_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
     entity = make_client_entity(organization_id=UUID(ORG_ID))
     mock_client_service.update_one.return_value = entity
     body = {
+        "scopes": ["prs:administration"],
         "request_personal_id_types": ["oprf"],
         "certificates": [],
         "deleted": False,
@@ -151,6 +156,7 @@ def test_update_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
         "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "certificates": [str(CERTIFICATE_ID)],
+        "scopes": ["prs:administration"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
 
@@ -158,6 +164,7 @@ def test_update_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
         entity.id,
         UUID(ORG_ID),
         ClientUpdate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[],
             deleted=False,
@@ -182,6 +189,7 @@ def test_delete_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "deleted_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "certificates": [str(CERTIFICATE_ID)],
+        "scopes": ["prs:administration"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
     mock_client_service.delete_one.assert_called_once_with(UUID(CLIENT_ID), UUID(ORG_ID))

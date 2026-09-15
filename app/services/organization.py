@@ -9,6 +9,7 @@ from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.personal_id_type import PersonalIdTypeRepository
+from app.db.repository.scope import ScopeRepository
 from app.models.oin import Oin
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.utils.datetime import now_utc
@@ -24,9 +25,13 @@ class OrganizationService:
         with self.db.get_db_session(commit=True) as session:
             repo = session.get_repository(OrganizationRepository)
             personal_id_type_repo = session.get_repository(PersonalIdTypeRepository)
+            scope_repo = session.get_repository(ScopeRepository)
             receive_personal_id_types = personal_id_type_repo.get_many(
                 [str(e) for e in input.receive_personal_id_types]
             )
+            scopes = scope_repo.get_many(input.scopes)
+            if len(scopes) != len(input.scopes):
+                raise HTTPException(status_code=404, detail="Not all of provided scopes exists")
             if len(receive_personal_id_types) != len(input.receive_personal_id_types):
                 raise HTTPException(status_code=404, detail="Not all of provided receive personal_id_types exists")
             request_personal_id_types = personal_id_type_repo.get_many(
@@ -38,6 +43,7 @@ class OrganizationService:
                 OrganizationEntity(
                     external_id=input.external_id,
                     name=input.name,
+                    scopes=scopes,
                     receive_personal_id_types=receive_personal_id_types,
                     request_personal_id_types=request_personal_id_types,
                     hsm_key_versions=[
@@ -74,6 +80,7 @@ class OrganizationService:
     def update_one(self, id: UUID, organization_update: OrganizationUpdate) -> Organization:
         with self.db.get_db_session(commit=True) as session:
             repo = session.get_repository(OrganizationRepository)
+            scope_repo = session.get_repository(ScopeRepository)
             personal_id_type_repo = session.get_repository(PersonalIdTypeRepository)
             organization_entity = repo.get_one(id)
             if not organization_entity:
@@ -88,6 +95,10 @@ class OrganizationService:
             if not organization_entity.deleted_at and organization_update.deleted:
                 organization_entity.deleted_at = now
 
+            scopes = scope_repo.get_many(organization_update.scopes)
+            if len(scopes) != len(organization_update.scopes):
+                raise HTTPException(status_code=404, detail="Not all of provided scopes exists")
+
             receive_personal_id_types = personal_id_type_repo.get_many(organization_update.receive_personal_id_types)
             if len(receive_personal_id_types) != len(organization_update.receive_personal_id_types):
                 raise HTTPException(status_code=404, detail="Not all of provided receive personal_id_types exists")
@@ -96,6 +107,7 @@ class OrganizationService:
             if len(request_personal_id_types) != len(organization_update.request_personal_id_types):
                 raise HTTPException(status_code=404, detail="Not all of provided request personal_id_types exists")
 
+            organization_entity.scopes = list(scopes)
             organization_entity.receive_personal_id_types = list(receive_personal_id_types)
             organization_entity.request_personal_id_types = list(request_personal_id_types)
 
