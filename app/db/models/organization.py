@@ -11,7 +11,9 @@ from app.db.models.base import (
     WithUUID,
     organization_receive_personal_id_types,
     organization_request_personal_id_types,
+    organization_scopes,
 )
+from app.db.models.scope import ScopeEntity
 from app.db.types.oin_type import OinType
 from app.models.oin import Oin
 
@@ -44,6 +46,8 @@ class OrganizationEntity(Base, WithUUID, WithTimestamps):
 
     certificates: Mapped[list[CertificateEntity]] = relationship("CertificateEntity")
 
+    scopes: Mapped[list[ScopeEntity]] = relationship(secondary=organization_scopes)
+
     receive_personal_id_types: Mapped[list[PersonalIdTypeEntity]] = relationship(
         secondary=organization_receive_personal_id_types
     )
@@ -62,4 +66,5 @@ class OrganizationEntity(Base, WithUUID, WithTimestamps):
             "name": self.name,
             "receive_personal_id_types": [str(ra.name) for ra in self.receive_personal_id_types],
             "request_personal_id_types": [str(ra.name) for ra in self.request_personal_id_types],
+            "scopes": [str(s.name) for s in self.scopes],
         }

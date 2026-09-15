@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from app.db.db import Database
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.client import ClientCreate, ClientUpdate
 from app.models.oin import Oin
@@ -25,6 +26,7 @@ def test_create_and_update_should_update_name_and_deleted(database: Database) ->
     created = service.create_one(
         OrganizationCreate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF],
             request_personal_id_types=[PersonalIdType.OPRF],
             name=TEST_ORG_NAME,
@@ -34,6 +36,7 @@ def test_create_and_update_should_update_name_and_deleted(database: Database) ->
         created.id,
         OrganizationUpdate(
             external_id=TEST_OIN_2,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF],
             request_personal_id_types=[PersonalIdType.OPRF],
             name="Renamed",
@@ -104,6 +107,7 @@ def test_update_one_scope_can_be_removed_and_added_back(
     created = organization_service.create_one(
         OrganizationCreate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="created",
@@ -116,6 +120,7 @@ def test_update_one_scope_can_be_removed_and_added_back(
         created.id,
         OrganizationUpdate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF],
             request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="updated",
@@ -130,6 +135,7 @@ def test_update_one_scope_can_be_removed_and_added_back(
         created.id,
         OrganizationUpdate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="updated_back",
@@ -153,6 +159,7 @@ def test_update_one_scope_removal_blocked_when_used_by_client(
     created = organization_service.create_one(
         OrganizationCreate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="created",
@@ -162,7 +169,11 @@ def test_update_one_scope_removal_blocked_when_used_by_client(
     assert created.request_personal_id_types == [PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM]
 
     created_client = client_service.create_one(
-        created.id, ClientCreate(request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM])
+        created.id,
+        ClientCreate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+        ),
     )
 
     with pytest.raises(IntegrityError) as e:
@@ -170,6 +181,7 @@ def test_update_one_scope_removal_blocked_when_used_by_client(
             created.id,
             OrganizationUpdate(
                 external_id=TEST_OIN,
+                scopes=[AuthorizationScope.ADMINISTRATION],
                 receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
                 request_personal_id_types=[PersonalIdType.OPRF],
                 name="updated",
@@ -189,13 +201,20 @@ def test_update_one_scope_removal_blocked_when_used_by_client(
 
     # test_update_one_scope_removal_allowed_when_client_no_longer_uses_it
     client_service.update_one(
-        persisted_client.id, persisted.id, ClientUpdate(request_personal_id_types=[], deleted=False)
+        persisted_client.id,
+        persisted.id,
+        ClientUpdate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[],
+            deleted=False,
+        ),
     )
 
     result = organization_service.update_one(
         created.id,
         OrganizationUpdate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF],
             name="updated",
@@ -212,6 +231,7 @@ def test_update_one_register_id_conflict_raises_integrity_error(
     first = organization_service.create_one(
         OrganizationCreate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="first",
@@ -220,6 +240,7 @@ def test_update_one_register_id_conflict_raises_integrity_error(
     second = organization_service.create_one(
         OrganizationCreate(
             external_id=TEST_OIN_2,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="second",
@@ -230,6 +251,7 @@ def test_update_one_register_id_conflict_raises_integrity_error(
             first.id,
             OrganizationUpdate(
                 external_id=second.external_id,
+                scopes=[AuthorizationScope.ADMINISTRATION],
                 receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
                 request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
                 name="first",
@@ -246,6 +268,7 @@ def test_update_one_returns_none_when_not_found(
             uuid4(),
             OrganizationUpdate(
                 external_id=TEST_OIN,
+                scopes=[AuthorizationScope.ADMINISTRATION],
                 receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
                 request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
                 name="first",
@@ -269,6 +292,7 @@ def test_get_many_returns_all(
     first = organization_service.create_one(
         OrganizationCreate(
             external_id=TEST_OIN,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="first",
@@ -277,6 +301,7 @@ def test_get_many_returns_all(
     second = organization_service.create_one(
         OrganizationCreate(
             external_id=TEST_OIN_2,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
             name="second",
@@ -289,6 +314,7 @@ def test_get_many_returns_all(
         second.id,
         OrganizationUpdate(
             external_id=TEST_OIN_2,
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF],
             request_personal_id_types=[PersonalIdType.OPRF],
             name="Renamed",

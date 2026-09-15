@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.certificate import CertificateFields
 from app.models.client import (
@@ -30,7 +31,10 @@ def test_create_one_should_succeed(
 ) -> None:
     result = client_service.create_one(
         persisted_organization.id,
-        ClientCreate(request_personal_id_types=[PersonalIdType.OPRF]),
+        ClientCreate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.OPRF],
+        ),
     )
     assert isinstance(result.id, UUID)
     assert result.organization_id == persisted_organization.id
@@ -69,7 +73,7 @@ def test_update_one(
     result = client_service.update_one(
         persisted_client_entity.id,
         persisted_client_entity.organization_id,
-        ClientUpdate(request_personal_id_types=[], deleted=False),
+        ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False),
     )
     assert result is not None
     assert result.id == persisted_client_entity.id
@@ -89,7 +93,7 @@ def test_update_one_when_not_exists(
         client_service.update_one(
             client_id,
             organization_id,
-            ClientUpdate(request_personal_id_types=[], deleted=False),
+            ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False),
         )
     assert e.value.status_code == 404
     assert e.value.detail == ("Organization not found" if client_exists else "Client not found")
@@ -103,7 +107,8 @@ def test_get_many_returns_active_clients(
 ) -> None:
     for _ in range(count):
         client_service.create_one(
-            persisted_organization.id, ClientCreate(request_personal_id_types=[PersonalIdType.OPRF])
+            persisted_organization.id,
+            ClientCreate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[PersonalIdType.OPRF]),
         )
     assert len(client_service.get_many(persisted_organization.id, ClientQueryParams())) == count
 
@@ -125,12 +130,12 @@ def test_get_many_deleted_visibility(
 ) -> None:
     created = client_service.create_one(
         persisted_organization.id,
-        ClientCreate(request_personal_id_types=[PersonalIdType.OPRF]),
+        ClientCreate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[PersonalIdType.OPRF]),
     )
     client_service.update_one(
         created.id,
         persisted_organization.id,
-        ClientUpdate(deleted=True, request_personal_id_types=[]),
+        ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], deleted=True, request_personal_id_types=[]),
     )
     results = client_service.get_many(
         persisted_organization.id,
@@ -151,6 +156,7 @@ def test_update_one_scope_enforcement(
             persisted_client_entity.id,
             persisted_client_entity.organization_id,
             ClientUpdate(
+                scopes=[AuthorizationScope.ADMINISTRATION],
                 request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
                 deleted=False,
             ),
@@ -166,7 +172,7 @@ def test_update_one_scope_enforcement(
             TEST_EXTERNAL_ID,
             "domain.example.com",
             TEST_OIN,
-            ResolveResponse(scopes="prs:oprf", organization_name=TEST_ORG_NAME),
+            ResolveResponse(scopes="prs:administration", organization_name=TEST_ORG_NAME),
         ),
         (
             TEST_EXTERNAL_ID,
@@ -208,6 +214,7 @@ def test_resolve(
         persisted_client_entity.id,
         persisted_client_entity.organization_id,
         ClientUpdate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[certificate.id],
             deleted=False,

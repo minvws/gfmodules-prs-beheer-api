@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import HTTPException
 
 from app.db.db import Database
+from app.db.models import ClientScopeEntity
 from app.db.models.client import ClientEntity
 from app.db.models.client_personal_id_type import ClientPersonalIdTypeEntity
 from app.db.models.organization import OrganizationEntity
@@ -48,7 +49,16 @@ class ClientService:
         with self.db.get_db_session() as session:
             organization = self._get_organization_or_404(session, organization_id)
 
+            scopes_by_name = {item.name: item for item in organization.scopes}
             request_by_pid = {item.name: item for item in organization.request_personal_id_types}
+
+            scopes_not_in_organization = [s for s in input.scopes if s not in scopes_by_name]
+            if scopes_not_in_organization:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"The following scopes do not exist in the organization: {', '.join(scopes_not_in_organization)}",
+                )
+
             not_in_organization = [pid for pid in input.request_personal_id_types if pid not in request_by_pid]
             if not_in_organization:
                 raise HTTPException(
@@ -63,6 +73,13 @@ class ClientService:
             repo = session.get_repository(ClientRepository)
             entity = ClientEntity(
                 organization_id=organization_id,
+                scopes=[
+                    ClientScopeEntity(
+                        scope_id=scopes_by_name[scope].id,
+                        organization_id=organization.id,
+                    )
+                    for scope in input.scopes
+                ],
                 request_personal_id_types=[
                     ClientPersonalIdTypeEntity(
                         personal_id_type_id=request_by_pid[personal_id_type].id,
@@ -97,6 +114,7 @@ class ClientService:
     def update_one(self, id: UUID, organization_id: UUID, update: ClientUpdate) -> Client:
         with self.db.get_db_session(commit=True) as session:
             organization = self._get_organization_or_404(session, organization_id)
+            scopes_by_name = {item.name: item for item in organization.scopes}
             organization_pids = [pide.name for pide in organization.request_personal_id_types]
 
             not_in_organization = [pid for pid in update.request_personal_id_types if pid not in organization_pids]
@@ -104,6 +122,13 @@ class ClientService:
                 raise HTTPException(
                     status_code=404,
                     detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
+                )
+
+            scopes_not_in_organization = [s for s in update.scopes if s not in scopes_by_name]
+            if scopes_not_in_organization:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"The following scopes do not exist in the organization: {', '.join(scopes_not_in_organization)}",
                 )
 
             cert_repo = session.get_repository(CertificateRepository)
@@ -121,6 +146,13 @@ class ClientService:
             if not client_entity.deleted_at and update.deleted:
                 client_entity.deleted_at = now
 
+            client_entity.scopes = [
+                ClientScopeEntity(
+                    scope_id=scopes_by_name[scope].id,
+                    organization_id=organization.id,
+                )
+                for scope in update.scopes
+            ]
             updated = [
                 ClientPersonalIdTypeEntity(personal_id_type=rpit, organization_id=organization.id)
                 for rpit in organization.request_personal_id_types
@@ -157,7 +189,5 @@ class ClientService:
             entity = entities[0]
             return ResolveResponse(
                 organization_name=entity.organization.name,
-                scopes=" ".join(
-                    ["prs:" + str(rpit.personal_id_type.name) for rpit in entity.request_personal_id_types]
-                ),
+                scopes=" ".join([str(s.scope.name) for s in entity.scopes]),
             )

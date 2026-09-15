@@ -9,6 +9,7 @@ from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.client_personal_id_type import ClientPersonalIdTypeEntity
 from app.db.models.personal_id_type import PersonalIdTypeEntity
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.client import (
     Client,
@@ -23,7 +24,11 @@ from tests.conftest import TEST_OIN
 
 def test_create_should_succeed() -> None:
     certificate_uuid = uuid.uuid4()
-    model = ClientCreate(request_personal_id_types=[PersonalIdType.OPRF], certificates=[certificate_uuid])
+    model = ClientCreate(
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        request_personal_id_types=[PersonalIdType.OPRF],
+        certificates=[certificate_uuid],
+    )
     assert model.request_personal_id_types == [PersonalIdType.OPRF]
     assert model.certificates == [certificate_uuid]
 
@@ -31,7 +36,10 @@ def test_create_should_succeed() -> None:
 def test_update_should_succeed() -> None:
     certificate_uuid = uuid.uuid4()
     model = ClientUpdate(
-        request_personal_id_types=[PersonalIdType.OPRF], certificates=[certificate_uuid], deleted=False
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        request_personal_id_types=[PersonalIdType.OPRF],
+        certificates=[certificate_uuid],
+        deleted=False,
     )
     assert model.request_personal_id_types == [PersonalIdType.OPRF]
     assert model.certificates == [certificate_uuid]

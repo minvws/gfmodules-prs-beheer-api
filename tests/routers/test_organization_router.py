@@ -4,6 +4,7 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.organization import OrganizationCreate
 from tests.conftest import FIXED_CREATED_AT, TEST_ORG_NAME, VALID_OIN, make_organization_entity
@@ -54,6 +55,7 @@ def test_register_returns_201(api: TestClient, mock_organization_service: MagicM
     body: dict[str, object] = {
         "external_id": str(VALID_OIN),
         "name": "Org",
+        "scopes": ["prs:administration"],
         "receive_personal_id_types": ["oprf"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
@@ -67,6 +69,7 @@ def test_register_returns_201(api: TestClient, mock_organization_service: MagicM
         "name": TEST_ORG_NAME,
         "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "scopes": ["prs:administration"],
         "receive_personal_id_types": ["oprf"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
@@ -74,6 +77,7 @@ def test_register_returns_201(api: TestClient, mock_organization_service: MagicM
         OrganizationCreate(
             external_id=VALID_OIN,
             name="Org",
+            scopes=[AuthorizationScope.ADMINISTRATION],
             receive_personal_id_types=[PersonalIdType.OPRF],
             request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
         )
@@ -156,6 +160,7 @@ def test_update_returns_200(api: TestClient, mock_organization_service: MagicMoc
     body: dict[str, object] = {
         "external_id": str(VALID_OIN),
         "name": "Org",
+        "scopes": ["prs:administration"],
         "receive_personal_id_types": ["oprf"],
         "request_personal_id_types": ["reversible_pseudonym"],
         "deleted": False,
@@ -179,6 +184,7 @@ def test_update_invalid_uuid_returns_422(api: TestClient) -> None:
     body: dict[str, object] = {
         "external_id": str(VALID_OIN),
         "name": "Org",
+        "scopes": ["prs:administration"],
         "receive_personal_id_types": ["oprf"],
         "request_personal_id_types": ["reversible_pseudonym"],
         "deleted": False,
@@ -202,6 +208,7 @@ def test_delete_returns_204(api: TestClient, mock_organization_service: MagicMoc
         "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "deleted_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "scopes": ["prs:administration"],
         "receive_personal_id_types": ["oprf"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }

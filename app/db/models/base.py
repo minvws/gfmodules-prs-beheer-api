@@ -83,3 +83,12 @@ organization_request_personal_id_types = Table(
     Column("personal_id_type_id", INTEGER, ForeignKey("admin.personal_id_types.id"), primary_key=True),
     schema="admin",
 )
+
+organization_scopes = Table(
+    "organization_scopes",
+    Base.metadata,
+    admin_metadata_obj,
+    Column("organization_id", UUID, ForeignKey("admin.organizations.id"), primary_key=True),
+    Column("scope_id", INTEGER, ForeignKey("admin.scopes.id"), primary_key=True),
+    schema="admin",
+)

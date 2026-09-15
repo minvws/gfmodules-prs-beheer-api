@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.base import INCLUDE_DELETED_DESCRIPTION, BaseReadFields
 from app.models.oin import Oin
@@ -18,6 +19,7 @@ class OrganizationFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     external_id: Oin = Field(..., description=EXTERNAL_ID_DESCRIPTION)
     name: str = Field(..., description=NAME_DESCRIPTION, examples=["OrganizationName"])
+    scopes: list[AuthorizationScope] = Field(examples=[[AuthorizationScope.ADMINISTRATION]])
     receive_personal_id_types: list[PersonalIdType] = Field(examples=[[PersonalIdType.OPRF]])
     request_personal_id_types: list[PersonalIdType] = Field(examples=[[PersonalIdType.OPRF]])
 

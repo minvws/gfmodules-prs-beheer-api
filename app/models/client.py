@@ -2,6 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.base import INCLUDE_DELETED_DESCRIPTION, BaseReadFields
 from app.models.oin import Oin
@@ -15,6 +16,7 @@ ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on
 
 class ClientFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    scopes: list[AuthorizationScope] = Field(examples=[[AuthorizationScope.ADMINISTRATION]])
     request_personal_id_types: list[PersonalIdType] = Field(examples=[[PersonalIdType.OPRF]])
     certificates: list[UUID] = []
 
