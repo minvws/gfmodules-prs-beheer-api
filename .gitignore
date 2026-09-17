@@ -9,3 +9,4 @@ secrets/
 coverage.xml
 .venv
 node_modules/
+version.json
