@@ -52,7 +52,7 @@ async def request_validation_exception_handler(
         logger,
         Log.ONBOARDING_VALIDATION_FAILED,
         "validation failed for supplied registration data",
-        fields={"error_reason": _error_reason(exc), "endpoint": request.url.path},
+        fields={"error_reason": _error_reason(exc)},
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 

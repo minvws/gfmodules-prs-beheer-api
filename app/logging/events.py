@@ -67,7 +67,7 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("error_reason", "endpoint"),
+            _APP: ("error_reason",),
             _SIEM: ("error_reason",),
         },
     )
