@@ -94,12 +94,11 @@ class TestOnboardingValidationFailed:
             Log.ONBOARDING_VALIDATION_FAILED,
             "validation failed",
             error_reason="register_id: invalid OIN",
-            endpoint="/organizations",
         )
 
-    def test_siem_does_not_receive_the_endpoint(self, routed: Routed) -> None:
+    def test_both_streams_receive_the_endpoint(self, routed: Routed) -> None:
         assert routed[LoggingStreams.APP][0]["endpoint"] == "/organizations"
-        assert_fields_absent(routed[LoggingStreams.SIEM], "endpoint")
+        assert routed[LoggingStreams.SIEM][0]["endpoint"] == "/organizations"
 
     def test_both_streams_receive_the_error_reason(self, routed: Routed) -> None:
         assert routed[LoggingStreams.APP][0]["error_reason"] == "register_id: invalid OIN"
