@@ -48,14 +48,14 @@ class ClientRepository(RepositoryBase):
         organization_external_id: Oin,
         certificate_domain: str,
         certificate_organization_identifier: str,
-        client_id: UUID | None = None,
+        client_id: UUID,
     ) -> Sequence[ClientEntity]:
         stmt = select(ClientEntity)
-        conditions = []
-        if client_id is not None:
-            conditions.append(ClientEntity.id == client_id)
         stmt = stmt.join(ClientEntity.organization)
-        conditions.append(OrganizationEntity.external_id == organization_external_id)
+        conditions = [
+            ClientEntity.id == client_id,
+            OrganizationEntity.external_id == organization_external_id,
+        ]
         conditions.append(
             ClientEntity.certificates.any(
                 domain=certificate_domain,
