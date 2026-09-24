@@ -37,14 +37,8 @@ class Client(BaseReadFields, ClientFields):
     organization_id: UUID
 
 
-class DeprecatedResolveRequest(BaseModel):
-    client_organization_id: Oin = Field(description=ORGANIZATION_IDENTIFIER_DESCRIPTION, deprecated=True)
-    client_common_name: str = Field(description=DOMAIN_DESCRIPTION, deprecated=True)
-    organization_id: Oin = Field(description=EXTERNAL_ID_DESCRIPTION, deprecated=True)
-
-
 class ResolveRequest(BaseModel):
-    client_id: UUID | None = Field(description=CLIENT_ID_DESCRIPTION, default=None)
+    client_id: UUID = Field(description=CLIENT_ID_DESCRIPTION)
     organization_external_id: Oin = Field(description=EXTERNAL_ID_DESCRIPTION)
     certificate_domain: str = Field(description=DOMAIN_DESCRIPTION)
     certificate_organization_identifier: str = Field(description=ORGANIZATION_IDENTIFIER_DESCRIPTION)
