@@ -102,19 +102,6 @@ def test_resolve_request_should_succeed() -> None:
     assert model.certificate_organization_identifier == "cert_org_id"
 
 
-def test_resolve_request_missing_client_id_should_succeed() -> None:
-    model = ResolveRequest(
-        client_id=None,
-        organization_external_id=TEST_OIN,
-        certificate_domain="domain",
-        certificate_organization_identifier="cert_org_id",
-    )
-    assert model.client_id == None
-    assert model.organization_external_id == TEST_OIN
-    assert model.certificate_domain == "domain"
-    assert model.certificate_organization_identifier == "cert_org_id"
-
-
 @pytest.mark.parametrize(
     [
         "client_id",
@@ -124,6 +111,7 @@ def test_resolve_request_missing_client_id_should_succeed() -> None:
     ],
     [
         (uuid.uuid4(), None, "domain", "cert_org_id"),
+        (None, TEST_OIN, "domain", "cert_org_id"),
     ],
 )
 def test_resolve_request_missing_fields_should_raise(

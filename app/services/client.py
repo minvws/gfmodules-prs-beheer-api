@@ -181,7 +181,7 @@ class ClientService:
                 certificate_organization_identifier=resolve_request.certificate_organization_identifier,
                 client_id=resolve_request.client_id,
             )
-            if resolve_request.client_id is not None and len(entities) > 1:
+            if len(entities) > 1:
                 logger.error("It should not be possible to have multiple clients for a single client id")
                 raise HTTPException(status_code=500, detail="Internal Server Error")
             if not entities:
