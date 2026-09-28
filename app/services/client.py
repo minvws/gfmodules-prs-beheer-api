@@ -177,7 +177,7 @@ class ClientService:
             client_repo = session.get_repository(ClientRepository)
             entities = client_repo.get_many_for_certificates(
                 organization_external_id=resolve_request.organization_external_id,
-                certificate_domain=resolve_request.certificate_domain,
+                certificate_domains=resolve_request.certificate_domains,
                 certificate_organization_identifier=resolve_request.certificate_organization_identifier,
                 client_id=resolve_request.client_id,
             )
@@ -187,7 +187,14 @@ class ClientService:
             if not entities:
                 raise HTTPException(status_code=404, detail="Client authorization does not exist for given parameters")
             entity = entities[0]
+            matched_certificate = next(
+                certificate
+                for certificate in entity.certificates
+                if certificate.organization_identifier == resolve_request.certificate_organization_identifier
+                and certificate.domain in resolve_request.certificate_domains
+            )
             return ResolveResponse(
                 organization_name=entity.organization.name,
                 scopes=" ".join([str(s.scope.name) for s in entity.scopes]),
+                matched_domain=matched_certificate.domain,
             )

@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy import ColumnElement, and_, select
 
+from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.base import RepositoryBase
@@ -46,7 +47,7 @@ class ClientRepository(RepositoryBase):
     def get_many_for_certificates(
         self,
         organization_external_id: Oin,
-        certificate_domain: str,
+        certificate_domains: list[str],
         certificate_organization_identifier: str,
         client_id: UUID,
     ) -> Sequence[ClientEntity]:
@@ -58,8 +59,10 @@ class ClientRepository(RepositoryBase):
         ]
         conditions.append(
             ClientEntity.certificates.any(
-                domain=certificate_domain,
-                organization_identifier=certificate_organization_identifier,
+                and_(
+                    CertificateEntity.domain.in_(certificate_domains),
+                    CertificateEntity.organization_identifier == certificate_organization_identifier,
+                )
             )
         )
         conditions.append(ClientEntity.deleted_at.is_(None))

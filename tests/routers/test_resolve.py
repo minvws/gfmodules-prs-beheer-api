@@ -16,7 +16,7 @@ def _body(**overrides: object) -> dict[str, object]:
     body: dict[str, object] = {
         "client_id": str(uuid.uuid4()),
         "certificate_organization_identifier": VALID_OIN.value,
-        "certificate_domain": "Client",
+        "certificate_domains": ["Client"],
         "organization_external_id": ORG_OIN,
     }
     body.update(overrides)
@@ -27,19 +27,23 @@ def _body(**overrides: object) -> dict[str, object]:
 def test_resolve_returns_scopes_and_organization_name(
     api: TestClient, mock_client_service: MagicMock, scopes: str
 ) -> None:
-    resolve_response = ResolveResponse(scopes=scopes, organization_name=TEST_ORG_NAME)
+    resolve_response = ResolveResponse(scopes=scopes, organization_name=TEST_ORG_NAME, matched_domain="Client")
     mock_client_service.resolve.return_value = resolve_response
     client_id = uuid.uuid4()
 
     response = api.post(RESOLVE, json=_body(client_id=str(client_id)))
 
     assert response.status_code == 200
-    assert response.json() == {"scopes": scopes, "organization_name": "Test Organization"}
+    assert response.json() == {
+        "scopes": scopes,
+        "organization_name": "Test Organization",
+        "matched_domain": "Client",
+    }
     mock_client_service.resolve.assert_called_once_with(
         ResolveRequest(
             client_id=client_id,
             organization_external_id=Oin(ORG_OIN),
-            certificate_domain="Client",
+            certificate_domains=["Client"],
             certificate_organization_identifier=VALID_OIN.value,
         )
     )
@@ -50,15 +54,15 @@ def test_resolve_returns_scopes_and_organization_name(
     [
         {  # missing client_id
             "certificate_organization_identifier": str(VALID_OIN),
-            "certificate_domain": "C",
+            "certificate_domains": ["C"],
             "organization_external_id": ORG_OIN,
         },
         {  # missing certificate_organization_identifier
             "client_id": str(uuid.uuid4()),
-            "certificate_domain": "C",
+            "certificate_domains": ["C"],
             "organization_external_id": ORG_OIN,
         },
-        {  # missing certificate_domain
+        {  # missing certificate_domains
             "client_id": str(uuid.uuid4()),
             "certificate_organization_identifier": str(VALID_OIN),
             "organization_external_id": ORG_OIN,
@@ -66,18 +70,18 @@ def test_resolve_returns_scopes_and_organization_name(
         {  # missing organization_external_id
             "client_id": str(uuid.uuid4()),
             "certificate_organization_identifier": str(VALID_OIN),
-            "certificate_domain": "C",
+            "certificate_domains": ["C"],
         },
         {  # malformed organization_external_id
             "client_id": str(uuid.uuid4()),
             "certificate_organization_identifier": str(VALID_OIN),
-            "certificate_domain": "C",
+            "certificate_domains": ["C"],
             "organization_external_id": "invalid-oin",
         },
         {  # malformed client_id
             "client_id": "not-a-uuid",
             "certificate_organization_identifier": str(VALID_OIN),
-            "certificate_domain": "C",
+            "certificate_domains": ["C"],
             "organization_external_id": ORG_OIN,
         },
     ],

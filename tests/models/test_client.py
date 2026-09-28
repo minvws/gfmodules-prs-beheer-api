@@ -93,12 +93,12 @@ def test_resolve_request_should_succeed() -> None:
     model = ResolveRequest(
         client_id=client_id,
         organization_external_id=TEST_OIN,
-        certificate_domain="domain",
+        certificate_domains=["domain"],
         certificate_organization_identifier="cert_org_id",
     )
     assert model.client_id == client_id
     assert model.organization_external_id == TEST_OIN
-    assert model.certificate_domain == "domain"
+    assert model.certificate_domains == ["domain"]
     assert model.certificate_organization_identifier == "cert_org_id"
 
 
@@ -106,25 +106,25 @@ def test_resolve_request_should_succeed() -> None:
     [
         "client_id",
         "organization_external_id",
-        "certificate_domain",
+        "certificate_domains",
         "certificate_organization_identifier",
     ],
     [
-        (uuid.uuid4(), None, "domain", "cert_org_id"),
-        (None, TEST_OIN, "domain", "cert_org_id"),
+        (uuid.uuid4(), None, ["domain"], "cert_org_id"),
+        (None, TEST_OIN, ["domain"], "cert_org_id"),
     ],
 )
 def test_resolve_request_missing_fields_should_raise(
     client_id: UUID,
     organization_external_id: Oin,
-    certificate_domain: str,
+    certificate_domains: list[str],
     certificate_organization_identifier: str,
 ) -> None:
     with pytest.raises(ValidationError) as e:
         ResolveRequest(
             client_id=client_id,
             organization_external_id=organization_external_id,
-            certificate_domain=certificate_domain,
+            certificate_domains=certificate_domains,
             certificate_organization_identifier=certificate_organization_identifier,
         )
     assert e.value.error_count() == 1
