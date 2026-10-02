@@ -166,29 +166,39 @@ def test_update_one_scope_enforcement(
 
 
 @pytest.mark.parametrize(
-    ["organization_external_id", "certificate_domain", "certificate_organization_identifier", "resolve_response"],
+    ["organization_external_id", "certificate_domains", "certificate_organization_identifier", "resolve_response"],
     [
         (
             TEST_EXTERNAL_ID,
-            "domain.example.com",
+            ["domain.example.com"],
             TEST_OIN,
-            ResolveResponse(scopes="prs:administration", organization_name=TEST_ORG_NAME),
+            ResolveResponse(
+                scopes="prs:administration", organization_name=TEST_ORG_NAME, matched_domain="domain.example.com"
+            ),
         ),
         (
             TEST_EXTERNAL_ID,
-            "domain.example.com",
+            ["other.example.com", "domain.example.com"],
+            TEST_OIN,
+            ResolveResponse(
+                scopes="prs:administration", organization_name=TEST_ORG_NAME, matched_domain="domain.example.com"
+            ),
+        ),
+        (
+            TEST_EXTERNAL_ID,
+            ["domain.example.com"],
             TEST_OIN_2,
             None,
         ),
         (
             TEST_EXTERNAL_ID,
-            "invalid.example.com",
+            ["invalid.example.com"],
             TEST_OIN,
             None,
         ),
         (
             TEST_OIN_2,
-            "domain.example.com",
+            ["domain.example.com"],
             TEST_OIN,
             None,
         ),
@@ -199,7 +209,7 @@ def test_resolve(
     certificate_service: CertificateService,
     persisted_client_entity: ClientEntity,
     organization_external_id: Oin,
-    certificate_domain: str,
+    certificate_domains: list[str],
     certificate_organization_identifier: Oin,
     resolve_response: ResolveResponse | None,
 ) -> None:
@@ -226,7 +236,7 @@ def test_resolve(
                 ResolveRequest(
                     client_id=persisted_client_entity.id,
                     organization_external_id=organization_external_id,
-                    certificate_domain=certificate_domain,
+                    certificate_domains=certificate_domains,
                     certificate_organization_identifier=str(certificate_organization_identifier),
                 )
             )
@@ -237,7 +247,7 @@ def test_resolve(
             ResolveRequest(
                 client_id=persisted_client_entity.id,
                 organization_external_id=organization_external_id,
-                certificate_domain=certificate_domain,
+                certificate_domains=certificate_domains,
                 certificate_organization_identifier=str(certificate_organization_identifier),
             )
         )
