@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 from unittest.mock import patch
 
@@ -64,7 +64,7 @@ def test_commit_failure_leaves_nothing_persisted(retrying_database: Database) ->
             session.commit()
 
     with retrying_database.get_db_session() as session:
-        rows = session.execute(select(OrganizationEntity)).scalars().all()
+        rows: Sequence[Any] = session.execute(select(OrganizationEntity)).scalars().all()
         assert rows == []
 
 
@@ -86,7 +86,7 @@ def test_reads_are_still_retried_after_a_rollback() -> None:
             return real_execute(*args, **kwargs)
 
         with patch.object(session.session, "execute", side_effect=execute):
-            rows = session.execute(select(OrganizationEntity)).scalars().all()
+            rows: Sequence[Any] = session.execute(select(OrganizationEntity)).scalars().all()
 
         assert rows == []
         assert not flaky, "the read should have been retried after the rollback"
