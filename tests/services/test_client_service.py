@@ -23,8 +23,10 @@ from app.models.client import (
     ResolveResponse,
 )
 from app.models.oin import Oin
+from app.models.organization import OrganizationCreate
 from app.services.certificate import CertificateService
 from app.services.client import ClientService
+from app.services.organization import OrganizationService
 from tests.conftest import TEST_EXTERNAL_ID, TEST_OIN, TEST_OIN_2, TEST_ORG_NAME
 
 ALT_OIN = Oin("00000099000000002000")
@@ -362,3 +364,112 @@ def test_resolve_should_reject_client_of_deleted_organization(
         )
     assert e.value.status_code == 404
     assert e.value.detail == "Client authorization does not exist for given parameters"
+
+
+def _unusable_certificate_id(
+    kind: str,
+    certificate_service: CertificateService,
+    organization_service: OrganizationService,
+    organization_id: UUID,
+) -> UUID:
+    if kind == "unknown":
+        return uuid4()
+    if kind == "deleted":
+        deleted = certificate_service.create_one(
+            organization_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="deleted.example.com")
+        )
+        certificate_service.delete_one(organization_id, deleted.id)
+        return deleted.id
+    other_org = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN_2,
+            name="Other Organization",
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            receive_personal_id_types=[PersonalIdType.OPRF],
+            request_personal_id_types=[PersonalIdType.OPRF],
+        )
+    )
+    return certificate_service.create_one(
+        other_org.id, CertificateFields(organization_identifier=str(TEST_OIN), domain="other.example.com")
+    ).id
+
+
+@pytest.mark.parametrize("kind", ["unknown", "deleted", "other_organization"])
+def test_create_one_should_reject_unusable_certificate(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    organization_service: OrganizationService,
+    persisted_organization: OrganizationEntity,
+    kind: str,
+) -> None:
+    target_id = _unusable_certificate_id(kind, certificate_service, organization_service, persisted_organization.id)
+
+    with pytest.raises(HTTPException) as e:
+        client_service.create_one(
+            persisted_organization.id,
+            ClientCreate(
+                scopes=[AuthorizationScope.ADMINISTRATION],
+                request_personal_id_types=[PersonalIdType.OPRF],
+                certificates=[target_id],
+            ),
+        )
+    assert e.value.status_code == 404
+    assert e.value.detail == "Not all requested certificates exists"
+    assert client_service.get_many(persisted_organization.id, ClientQueryParams()) == []
+
+
+@pytest.mark.parametrize("kind", ["unknown", "deleted", "other_organization"])
+def test_update_one_should_reject_unusable_certificate(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    organization_service: OrganizationService,
+    persisted_client_entity: ClientEntity,
+    kind: str,
+) -> None:
+    org_id = persisted_client_entity.organization_id
+    linked = certificate_service.create_one(
+        org_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="linked.example.com")
+    )
+    _link_certificates(client_service, persisted_client_entity, [linked.id])
+    target_id = _unusable_certificate_id(kind, certificate_service, organization_service, org_id)
+
+    with pytest.raises(HTTPException) as e:
+        _link_certificates(client_service, persisted_client_entity, [linked.id, target_id])
+    assert e.value.status_code == 404
+    assert e.value.detail == "Not all requested certificates exists"
+
+    persisted = client_service.get_one(persisted_client_entity.id, org_id)
+    assert persisted.certificates == [linked.id]
+
+
+def test_create_and_update_should_accept_duplicate_certificate_ids(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    certificate = certificate_service.create_one(
+        persisted_organization.id,
+        CertificateFields(organization_identifier=str(TEST_OIN), domain="domain.example.com"),
+    )
+
+    created = client_service.create_one(
+        persisted_organization.id,
+        ClientCreate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            certificates=[certificate.id, certificate.id],
+        ),
+    )
+    assert created.certificates == [certificate.id]
+
+    updated = client_service.update_one(
+        created.id,
+        persisted_organization.id,
+        ClientUpdate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            certificates=[certificate.id, certificate.id],
+            deleted=False,
+        ),
+    )
+    assert updated.certificates == [certificate.id]
