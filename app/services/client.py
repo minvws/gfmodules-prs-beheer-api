@@ -190,7 +190,8 @@ class ClientService:
             matched_certificate = next(
                 certificate
                 for certificate in entity.certificates
-                if certificate.organization_identifier == resolve_request.certificate_organization_identifier
+                if certificate.deleted_at is None
+                and certificate.organization_identifier == resolve_request.certificate_organization_identifier
                 and certificate.domain in resolve_request.certificate_domains
             )
             return ResolveResponse(
