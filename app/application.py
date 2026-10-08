@@ -36,7 +36,7 @@ def _error_reason(exc: RequestValidationError) -> str:
     return "; ".join(f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in exc.errors())
 
 
-async def request_validation_exception_handler(
+def request_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
