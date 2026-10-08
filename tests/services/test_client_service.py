@@ -1,5 +1,6 @@
 import uuid
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -10,6 +11,7 @@ from pytest_mock import MockerFixture
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
+from app.db.session import DbSession
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.certificate import CertificateFields
@@ -332,3 +334,31 @@ def test_resolve_should_match_active_certificate_when_another_is_deleted(
         )
     )
     assert resolved.matched_domain == "active.example.com"
+
+
+def test_resolve_should_reject_client_of_deleted_organization(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    persisted_client_entity: ClientEntity,
+    db_session: DbSession,
+) -> None:
+    org_id = persisted_client_entity.organization_id
+    certificate = certificate_service.create_one(
+        org_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="domain.example.com")
+    )
+    _link_certificates(client_service, persisted_client_entity, [certificate.id])
+    # Deleting an organization with active clients is refused by the service, but may exist from before that check
+    persisted_client_entity.organization.deleted_at = datetime.now(tz=timezone.utc)
+    db_session.commit()
+
+    with pytest.raises(HTTPException) as e:
+        client_service.resolve(
+            ResolveRequest(
+                client_id=persisted_client_entity.id,
+                organization_external_id=TEST_EXTERNAL_ID,
+                certificate_domains=["domain.example.com"],
+                certificate_organization_identifier=str(TEST_OIN),
+            )
+        )
+    assert e.value.status_code == 404
+    assert e.value.detail == "Client authorization does not exist for given parameters"
