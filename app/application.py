@@ -40,19 +40,19 @@ async def request_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
-    body = (await request.body()).decode(errors="replace")
+    # Log only where and why validation failed; the rejected input values may contain request body data
+    error_reason = _error_reason(exc)
     logger.warning(
-        "Request validation failed method=%s path=%s body=%s errors=%s",
+        "Request validation failed method=%s path=%s errors=%s",
         request.method,
         request.url.path,
-        body,
-        exc.errors(),
+        error_reason,
     )
     gflog.emit(
         logger,
         Log.ONBOARDING_VALIDATION_FAILED,
         "validation failed for supplied registration data",
-        fields={"error_reason": _error_reason(exc)},
+        fields={"error_reason": error_reason},
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
