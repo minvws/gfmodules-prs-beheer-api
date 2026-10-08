@@ -62,6 +62,7 @@ class ClientRepository(RepositoryBase):
                 and_(
                     CertificateEntity.domain.in_(certificate_domains),
                     CertificateEntity.organization_identifier == certificate_organization_identifier,
+                    CertificateEntity.deleted_at.is_(None),
                 )
             )
         )
