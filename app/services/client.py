@@ -2,8 +2,6 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.db.db import Database
 from app.db.models import ClientScopeEntity
 from app.db.models.certificate import CertificateEntity
@@ -14,6 +12,14 @@ from app.db.repository.certificate import CertificateRepository
 from app.db.repository.client import ClientRepository
 from app.db.repository.organization import OrganizationRepository
 from app.db.session import DbSession
+from app.exceptions import (
+    CertificatesNotFoundError,
+    ClientAuthorizationNotFoundError,
+    ClientNotFoundError,
+    OrganizationNotFoundError,
+    PersonalIdTypesNotInOrganizationError,
+    ScopesNotInOrganizationError,
+)
 from app.models.client import (
     Client,
     ClientCreate,
@@ -33,16 +39,16 @@ class ClientService:
     ) -> None:
         self.db = db
 
-    def _get_organization_or_404(self, session: DbSession, organization_id: UUID) -> OrganizationEntity:
+    def _get_organization(self, session: DbSession, organization_id: UUID) -> OrganizationEntity:
         logger.debug("Checking if organization %s exists", organization_id)
         org_repo: OrganizationRepository = session.get_repository(OrganizationRepository)
         organization = org_repo.get_one(organization_id)
         if not organization or organization.deleted_at is not None:
             logger.debug("Organization %s not found", organization_id)
-            raise HTTPException(status_code=404, detail="Organization not found")
+            raise OrganizationNotFoundError()
         return organization
 
-    def _get_certificates_or_404(
+    def _get_certificates(
         self, session: DbSession, organization_id: UUID, certificate_ids: list[UUID]
     ) -> list[CertificateEntity]:
         cert_repo = session.get_repository(CertificateRepository)
@@ -50,7 +56,7 @@ class ClientService:
         missing = set(certificate_ids) - {c.id for c in certificates}
         if missing:
             logger.debug("Certificates %s not found in organization %s", missing, organization_id)
-            raise HTTPException(status_code=404, detail="Not all requested certificates exists")
+            raise CertificatesNotFoundError()
         return certificates
 
     def create_one(
@@ -59,25 +65,19 @@ class ClientService:
         input: ClientCreate,
     ) -> Client:
         with self.db.get_db_session() as session:
-            organization = self._get_organization_or_404(session, organization_id)
+            organization = self._get_organization(session, organization_id)
 
             scopes_by_name = {item.name: item for item in organization.scopes}
             request_by_pid = {item.name: item for item in organization.request_personal_id_types}
 
             scopes_not_in_organization = [s for s in input.scopes if s not in scopes_by_name]
             if scopes_not_in_organization:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"The following scopes do not exist in the organization: {', '.join(scopes_not_in_organization)}",
-                )
+                raise ScopesNotInOrganizationError(scopes_not_in_organization)
 
             not_in_organization = [pid for pid in input.request_personal_id_types if pid not in request_by_pid]
             if not_in_organization:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
-                )
-            certificates = self._get_certificates_or_404(session, organization_id, input.certificates)
+                raise PersonalIdTypesNotInOrganizationError(not_in_organization)
+            certificates = self._get_certificates(session, organization_id, input.certificates)
 
             repo = session.get_repository(ClientRepository)
             entity = ClientEntity(
@@ -107,7 +107,7 @@ class ClientService:
             repo = session.get_repository(ClientRepository)
             entity = repo.get_one(organization_id, id)
             if not entity:
-                raise HTTPException(status_code=404, detail="Client not found")
+                raise ClientNotFoundError()
             return Client(**entity.to_dict())
 
     def get_many(self, organization_id: UUID, client_query_params: ClientQueryParams) -> list[Client]:
@@ -122,30 +122,24 @@ class ClientService:
 
     def update_one(self, id: UUID, organization_id: UUID, update: ClientUpdate) -> Client:
         with self.db.get_db_session(commit=True) as session:
-            organization = self._get_organization_or_404(session, organization_id)
+            organization = self._get_organization(session, organization_id)
             scopes_by_name = {item.name: item for item in organization.scopes}
             organization_pids = [pide.name for pide in organization.request_personal_id_types]
 
             not_in_organization = [pid for pid in update.request_personal_id_types if pid not in organization_pids]
             if not_in_organization:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
-                )
+                raise PersonalIdTypesNotInOrganizationError(not_in_organization)
 
             scopes_not_in_organization = [s for s in update.scopes if s not in scopes_by_name]
             if scopes_not_in_organization:
-                raise HTTPException(
-                    status_code=404,
-                    detail=f"The following scopes do not exist in the organization: {', '.join(scopes_not_in_organization)}",
-                )
+                raise ScopesNotInOrganizationError(scopes_not_in_organization)
 
-            certificates = self._get_certificates_or_404(session, organization_id, update.certificates)
+            certificates = self._get_certificates(session, organization_id, update.certificates)
             repo = session.get_repository(ClientRepository)
             client_entity = repo.get_one(organization_id, id)
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
-                raise HTTPException(status_code=404, detail="Client not found")
+                raise ClientNotFoundError()
             now = datetime.now(timezone.utc)
             client_entity.updated_at = now
             client_entity.certificates = certificates
@@ -175,7 +169,7 @@ class ClientService:
             client_entity = repo.get_one(organization_id, id)
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
-                raise HTTPException(status_code=404)
+                raise ClientNotFoundError()
             if client_entity.deleted_at is not None:
                 return Client(**client_entity.to_dict())
             client_entity.deleted_at = client_entity.updated_at = datetime.now(tz=timezone.utc)
@@ -192,10 +186,9 @@ class ClientService:
                 client_id=resolve_request.client_id,
             )
             if len(entities) > 1:
-                logger.error("It should not be possible to have multiple clients for a single client id")
-                raise HTTPException(status_code=500, detail="Internal Server Error")
+                raise RuntimeError("It should not be possible to have multiple clients for a single client id")
             if not entities:
-                raise HTTPException(status_code=404, detail="Client authorization does not exist for given parameters")
+                raise ClientAuthorizationNotFoundError()
             entity = entities[0]
             matched_certificate = next(
                 certificate

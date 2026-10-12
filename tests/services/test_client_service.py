@@ -5,7 +5,6 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import HTTPException
 from pytest_mock import MockerFixture
 
 from app.db.models.client import ClientEntity
@@ -14,6 +13,14 @@ from app.db.repository.client import ClientRepository
 from app.db.session import DbSession
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import (
+    CertificatesNotFoundError,
+    ClientAuthorizationNotFoundError,
+    ClientNotFoundError,
+    DomainError,
+    OrganizationNotFoundError,
+    PersonalIdTypesNotInOrganizationError,
+)
 from app.models.certificate import CertificateFields
 from app.models.client import (
     ClientCreate,
@@ -69,9 +76,8 @@ def test_get_one_lookup(
         result = client_service.get_one(client_id, organization_id)
         assert result.id == persisted_client_entity.id
     else:
-        with pytest.raises(HTTPException) as e:
+        with pytest.raises(ClientNotFoundError):
             client_service.get_one(client_id, organization_id)
-        assert e.value.status_code == 404
 
 
 def test_update_one(
@@ -97,14 +103,13 @@ def test_update_one_when_not_exists(
 ) -> None:
     client_id = persisted_client_entity.id if client_exists else uuid.uuid4()
     organization_id = persisted_client_entity.organization_id if organization_exists else uuid.uuid4()
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(DomainError) as e:
         client_service.update_one(
             client_id,
             organization_id,
             ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False),
         )
-    assert e.value.status_code == 404
-    assert e.value.detail == ("Organization not found" if client_exists else "Client not found")
+    assert isinstance(e.value, OrganizationNotFoundError if client_exists else ClientNotFoundError)
 
 
 @pytest.mark.parametrize("count", [0, 1, 2])
@@ -173,7 +178,7 @@ def test_update_one_scope_enforcement(
     client_service: ClientService,
     persisted_client_entity: ClientEntity,
 ) -> None:
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(PersonalIdTypesNotInOrganizationError) as e:
         client_service.update_one(
             persisted_client_entity.id,
             persisted_client_entity.organization_id,
@@ -183,8 +188,7 @@ def test_update_one_scope_enforcement(
                 deleted=False,
             ),
         )
-    assert e.value.status_code == 404
-    assert e.value.detail == "The following Personal id types do not exist in the organization: reversible_pseudonym"
+    assert e.value.message == "The following Personal id types do not exist in the organization: reversible_pseudonym"
 
 
 @pytest.mark.parametrize(
@@ -253,7 +257,7 @@ def test_resolve(
         ),
     )
     if not resolve_response:
-        with pytest.raises(HTTPException) as e:
+        with pytest.raises(ClientAuthorizationNotFoundError):
             client_service.resolve(
                 ResolveRequest(
                     client_id=persisted_client_entity.id,
@@ -262,8 +266,6 @@ def test_resolve(
                     certificate_organization_identifier=str(certificate_organization_identifier),
                 )
             )
-        assert e.value.status_code == 404
-        assert e.value.detail == "Client authorization does not exist for given parameters"
     else:
         resolved = client_service.resolve(
             ResolveRequest(
@@ -301,7 +303,7 @@ def test_resolve_should_reject_deleted_certificate(
     _link_certificates(client_service, persisted_client_entity, [certificate.id])
     certificate_service.delete_one(org_id, certificate.id)
 
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(ClientAuthorizationNotFoundError):
         client_service.resolve(
             ResolveRequest(
                 client_id=persisted_client_entity.id,
@@ -310,8 +312,6 @@ def test_resolve_should_reject_deleted_certificate(
                 certificate_organization_identifier=str(TEST_OIN),
             )
         )
-    assert e.value.status_code == 404
-    assert e.value.detail == "Client authorization does not exist for given parameters"
 
 
 def test_resolve_should_match_active_certificate_when_another_is_deleted(
@@ -367,7 +367,7 @@ def test_resolve_should_reject_client_of_deleted_organization(
     persisted_client_entity.organization.deleted_at = datetime.now(tz=timezone.utc)
     db_session.commit()
 
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(ClientAuthorizationNotFoundError):
         client_service.resolve(
             ResolveRequest(
                 client_id=persisted_client_entity.id,
@@ -376,8 +376,6 @@ def test_resolve_should_reject_client_of_deleted_organization(
                 certificate_organization_identifier=str(TEST_OIN),
             )
         )
-    assert e.value.status_code == 404
-    assert e.value.detail == "Client authorization does not exist for given parameters"
 
 
 def _unusable_certificate_id(
@@ -418,7 +416,7 @@ def test_create_one_should_reject_unusable_certificate(
 ) -> None:
     target_id = _unusable_certificate_id(kind, certificate_service, organization_service, persisted_organization.id)
 
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(CertificatesNotFoundError):
         client_service.create_one(
             persisted_organization.id,
             ClientCreate(
@@ -427,8 +425,6 @@ def test_create_one_should_reject_unusable_certificate(
                 certificates=[target_id],
             ),
         )
-    assert e.value.status_code == 404
-    assert e.value.detail == "Not all requested certificates exists"
     assert client_service.get_many(persisted_organization.id, ClientQueryParams()) == []
 
 
@@ -447,10 +443,8 @@ def test_update_one_should_reject_unusable_certificate(
     _link_certificates(client_service, persisted_client_entity, [linked.id])
     target_id = _unusable_certificate_id(kind, certificate_service, organization_service, org_id)
 
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(CertificatesNotFoundError):
         _link_certificates(client_service, persisted_client_entity, [linked.id, target_id])
-    assert e.value.status_code == 404
-    assert e.value.detail == "Not all requested certificates exists"
 
     persisted = client_service.get_one(persisted_client_entity.id, org_id)
     assert persisted.certificates == [linked.id]

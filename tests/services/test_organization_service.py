@@ -1,7 +1,6 @@
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
@@ -10,6 +9,7 @@ from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import OrganizationHasActiveClientsError, OrganizationNotFoundError
 from app.models.client import ClientCreate, ClientUpdate
 from app.models.oin import Oin
 from app.models.organization import OrganizationCreate, OrganizationUpdate
@@ -68,24 +68,20 @@ def test_get_one_should_succeed(
 def test_get_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(OrganizationNotFoundError):
         organization_service.get_one(uuid4())
-    assert e.value.status_code == 404
-    assert e.value.detail == "Organization not found"
 
 
 def test_delete_one_blocked_when_client_exists(
     organization_service: OrganizationService,
     persisted_client_entity: ClientEntity,
 ) -> None:
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(OrganizationHasActiveClientsError):
         organization_service.delete_one(persisted_client_entity.organization_id)
 
     persisted = organization_service.get_one(persisted_client_entity.organization_id)
     assert persisted is not None
     assert persisted.deleted_at is None
-    assert e.value.status_code == 403
-    assert e.value.detail == "Organization still has active clients"
 
 
 def test_delete_one_allowed_when_clients_are_deleted(
@@ -279,7 +275,7 @@ def test_update_one_register_id_conflict_raises_integrity_error(
 def test_update_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(OrganizationNotFoundError):
         organization_service.update_one(
             uuid4(),
             OrganizationUpdate(
@@ -291,8 +287,6 @@ def test_update_one_returns_none_when_not_found(
                 deleted=False,
             ),
         )
-    assert e.value.status_code == 404
-    assert e.value.detail == "Organization not found"
 
 
 def test_get_many_returns_empty_when_none(
@@ -378,13 +372,11 @@ def test_update_one_delete_blocked_when_client_exists(
 ) -> None:
     organization = persisted_client_entity.organization
 
-    with pytest.raises(HTTPException) as e:
+    with pytest.raises(OrganizationHasActiveClientsError):
         organization_service.update_one(organization.id, _deleted_update(organization))
 
     persisted = organization_service.get_one(organization.id)
     assert persisted.deleted_at is None
-    assert e.value.status_code == 403
-    assert e.value.detail == "Organization still has active clients"
 
 
 def test_update_one_delete_allowed_when_clients_are_deleted(
