@@ -100,6 +100,22 @@ def test_delete_one_allowed_when_clients_are_deleted(
     assert updated.id == persisted_client_entity.organization_id
 
 
+def test_delete_one_keeps_original_deletion_time_when_already_deleted(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    client_service.delete_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    organization_service.delete_one(persisted_client_entity.organization_id)
+    before = organization_service.get_one(persisted_client_entity.organization_id)
+    organization_service.delete_one(persisted_client_entity.organization_id)
+    after = organization_service.get_one(persisted_client_entity.organization_id)
+
+    assert before.deleted_at is not None
+    assert after.deleted_at == before.deleted_at
+    assert after.updated_at == before.updated_at
+
+
 def test_update_one_scope_can_be_removed_and_added_back(
     organization_service: OrganizationService,
 ) -> None:

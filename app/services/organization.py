@@ -122,6 +122,8 @@ class OrganizationService:
             if not entity:
                 logger.debug("Organization not found for update id=%s", id)
                 raise HTTPException(status_code=404)
+            if entity.deleted_at is not None:
+                return Organization(**entity.to_dict())
             self._assert_no_active_clients(entity)
             entity.updated_at = entity.deleted_at = datetime.now(tz=timezone.utc)
             ret_value = Organization(**entity.to_dict())
