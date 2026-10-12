@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from app.db.db import Database
 from app.db.models import ClientScopeEntity
+from app.db.models.certificate import CertificateEntity
 from app.db.models.client import ClientEntity
 from app.db.models.client_personal_id_type import ClientPersonalIdTypeEntity
 from app.db.models.organization import OrganizationEntity
@@ -41,6 +42,17 @@ class ClientService:
             raise HTTPException(status_code=404, detail="Organization not found")
         return organization
 
+    def _get_certificates_or_404(
+        self, session: DbSession, organization_id: UUID, certificate_ids: list[UUID]
+    ) -> list[CertificateEntity]:
+        cert_repo = session.get_repository(CertificateRepository)
+        certificates = list(cert_repo.get_many(organization_id, certificate_ids))
+        missing = set(certificate_ids) - {c.id for c in certificates}
+        if missing:
+            logger.debug("Certificates %s not found in organization %s", missing, organization_id)
+            raise HTTPException(status_code=404, detail="Not all requested certificates exists")
+        return certificates
+
     def create_one(
         self,
         organization_id: UUID,
@@ -65,10 +77,7 @@ class ClientService:
                     status_code=404,
                     detail=f"The following Personal id types do not exist in the organization: {', '.join(not_in_organization)}",
                 )
-            cert_repo = session.get_repository(CertificateRepository)
-            certificates = cert_repo.get_many(organization_id, input.certificates)
-            if len(certificates) != len(input.certificates):
-                raise HTTPException(status_code=404, detail="Not all requested certificates exists")
+            certificates = self._get_certificates_or_404(session, organization_id, input.certificates)
 
             repo = session.get_repository(ClientRepository)
             entity = ClientEntity(
@@ -87,7 +96,7 @@ class ClientService:
                     )
                     for personal_id_type in input.request_personal_id_types
                 ],
-                certificates=list(certificates),
+                certificates=certificates,
             )
             entity = repo.add_one(entity)
             session.commit()
@@ -131,8 +140,7 @@ class ClientService:
                     detail=f"The following scopes do not exist in the organization: {', '.join(scopes_not_in_organization)}",
                 )
 
-            cert_repo = session.get_repository(CertificateRepository)
-            certificates = list(cert_repo.get_many(organization_id, update.certificates))
+            certificates = self._get_certificates_or_404(session, organization_id, update.certificates)
             repo = session.get_repository(ClientRepository)
             client_entity = repo.get_one(organization_id, id)
             if not client_entity:

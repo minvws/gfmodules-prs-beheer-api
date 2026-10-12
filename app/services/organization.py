@@ -86,6 +86,8 @@ class OrganizationService:
             if not organization_entity:
                 logger.debug("Organization not found for update id=%s", id)
                 raise HTTPException(status_code=404, detail="Organization not found")
+            if not organization_entity.deleted_at and organization_update.deleted:
+                self._assert_no_active_clients(organization_entity)
             now = datetime.now(timezone.utc)
             organization_entity.external_id = organization_update.external_id
             organization_entity.name = organization_update.name
@@ -120,10 +122,14 @@ class OrganizationService:
             if not entity:
                 logger.debug("Organization not found for update id=%s", id)
                 raise HTTPException(status_code=404)
-            if [client for client in entity.clients if client.deleted_at is None]:
-                logger.debug("Organization still has active clients")
-                raise HTTPException(status_code=403, detail="Organization still has active clients")
+            self._assert_no_active_clients(entity)
             entity.updated_at = entity.deleted_at = datetime.now(tz=timezone.utc)
             ret_value = Organization(**entity.to_dict())
             session.commit()
             return ret_value
+
+    @staticmethod
+    def _assert_no_active_clients(entity: OrganizationEntity) -> None:
+        if [client for client in entity.clients if client.deleted_at is None]:
+            logger.debug("Organization still has active clients")
+            raise HTTPException(status_code=403, detail="Organization still has active clients")
