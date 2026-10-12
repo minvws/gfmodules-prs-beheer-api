@@ -1,11 +1,15 @@
 import uuid
+from collections.abc import Sequence
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
 from fastapi import HTTPException
+from pytest_mock import MockerFixture
 
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
+from app.db.repository.client import ClientRepository
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
 from app.models.certificate import CertificateFields
@@ -252,3 +256,79 @@ def test_resolve(
             )
         )
         assert resolved == resolve_response
+
+
+def _link_certificates(client_service: ClientService, client: ClientEntity, certificate_ids: list[UUID]) -> None:
+    client_service.update_one(
+        client.id,
+        client.organization_id,
+        ClientUpdate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            certificates=certificate_ids,
+            deleted=False,
+        ),
+    )
+
+
+def test_resolve_should_reject_deleted_certificate(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    org_id = persisted_client_entity.organization_id
+    certificate = certificate_service.create_one(
+        org_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="domain.example.com")
+    )
+    _link_certificates(client_service, persisted_client_entity, [certificate.id])
+    certificate_service.delete_one(org_id, certificate.id)
+
+    with pytest.raises(HTTPException) as e:
+        client_service.resolve(
+            ResolveRequest(
+                client_id=persisted_client_entity.id,
+                organization_external_id=TEST_EXTERNAL_ID,
+                certificate_domains=["domain.example.com"],
+                certificate_organization_identifier=str(TEST_OIN),
+            )
+        )
+    assert e.value.status_code == 404
+    assert e.value.detail == "Client authorization does not exist for given parameters"
+
+
+def test_resolve_should_match_active_certificate_when_another_is_deleted(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    persisted_client_entity: ClientEntity,
+    mocker: MockerFixture,
+) -> None:
+    org_id = persisted_client_entity.organization_id
+    deleted = certificate_service.create_one(
+        org_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="deleted.example.com")
+    )
+    active = certificate_service.create_one(
+        org_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="active.example.com")
+    )
+    _link_certificates(client_service, persisted_client_entity, [deleted.id, active.id])
+    certificate_service.delete_one(org_id, deleted.id)
+
+    # The certificate load order is not defined; put the deleted one first so it would be matched if not skipped
+    original = ClientRepository.get_many_for_certificates
+
+    def deleted_first(self: ClientRepository, **kwargs: Any) -> Sequence[ClientEntity]:
+        entities = original(self, **kwargs)
+        for entity in entities:
+            entity.certificates.sort(key=lambda c: c.deleted_at is None)
+        return entities
+
+    mocker.patch.object(ClientRepository, "get_many_for_certificates", deleted_first)
+
+    resolved = client_service.resolve(
+        ResolveRequest(
+            client_id=persisted_client_entity.id,
+            organization_external_id=TEST_EXTERNAL_ID,
+            certificate_domains=["deleted.example.com", "active.example.com"],
+            certificate_organization_identifier=str(TEST_OIN),
+        )
+    )
+    assert resolved.matched_domain == "active.example.com"
