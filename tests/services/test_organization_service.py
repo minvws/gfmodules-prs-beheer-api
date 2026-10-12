@@ -100,6 +100,22 @@ def test_delete_one_allowed_when_clients_are_deleted(
     assert updated.id == persisted_client_entity.organization_id
 
 
+def test_delete_one_keeps_original_deletion_time_when_already_deleted(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    client_service.delete_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    organization_service.delete_one(persisted_client_entity.organization_id)
+    before = organization_service.get_one(persisted_client_entity.organization_id)
+    organization_service.delete_one(persisted_client_entity.organization_id)
+    after = organization_service.get_one(persisted_client_entity.organization_id)
+
+    assert before.deleted_at is not None
+    assert after.deleted_at == before.deleted_at
+    assert after.updated_at == before.updated_at
+
+
 def test_update_one_scope_can_be_removed_and_added_back(
     organization_service: OrganizationService,
 ) -> None:
@@ -343,3 +359,42 @@ def test_get_many_filters_by_name(
     results = organization_service.get_many(name=persisted_organization.name)
     assert len(results) == 1
     assert results[0].name == persisted_organization.name
+
+
+def _deleted_update(organization: OrganizationEntity) -> OrganizationUpdate:
+    return OrganizationUpdate(
+        external_id=organization.external_id,
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        receive_personal_id_types=[PersonalIdType.OPRF],
+        request_personal_id_types=[PersonalIdType.OPRF],
+        name=organization.name,
+        deleted=True,
+    )
+
+
+def test_update_one_delete_blocked_when_client_exists(
+    organization_service: OrganizationService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    organization = persisted_client_entity.organization
+
+    with pytest.raises(HTTPException) as e:
+        organization_service.update_one(organization.id, _deleted_update(organization))
+
+    persisted = organization_service.get_one(organization.id)
+    assert persisted.deleted_at is None
+    assert e.value.status_code == 403
+    assert e.value.detail == "Organization still has active clients"
+
+
+def test_update_one_delete_allowed_when_clients_are_deleted(
+    organization_service: OrganizationService,
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    organization = persisted_client_entity.organization
+    client_service.delete_one(persisted_client_entity.id, organization.id)
+
+    result = organization_service.update_one(organization.id, _deleted_update(organization))
+
+    assert result.deleted_at is not None

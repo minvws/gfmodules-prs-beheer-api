@@ -56,6 +56,7 @@ class ClientRepository(RepositoryBase):
         conditions = [
             ClientEntity.id == client_id,
             OrganizationEntity.external_id == organization_external_id,
+            OrganizationEntity.deleted_at.is_(None),
         ]
         conditions.append(
             ClientEntity.certificates.any(
