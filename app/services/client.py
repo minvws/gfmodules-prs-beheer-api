@@ -168,6 +168,8 @@ class ClientService:
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
                 raise HTTPException(status_code=404)
+            if client_entity.deleted_at is not None:
+                return Client(**client_entity.to_dict())
             client_entity.deleted_at = client_entity.updated_at = datetime.now(tz=timezone.utc)
             session.commit()
             return Client(**client_entity.to_dict())
