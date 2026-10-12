@@ -1,10 +1,9 @@
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.db.db import Database
 from app.db.models import CertificateEntity
 from app.db.repository.certificate import CertificateRepository
+from app.exceptions import CertificateNotFoundError
 from app.models.certificate import Certificate, CertificateFields, CertificateQueryParams
 from app.utils.datetime import now_utc
 
@@ -44,7 +43,7 @@ class CertificateService:
             certificate_repository: CertificateRepository = session.get_repository(CertificateRepository)
             entity = certificate_repository.get_one(organization_id, certificate_id)
             if not entity:
-                raise HTTPException(status_code=404, detail="Certificate not found")
+                raise CertificateNotFoundError()
             return Certificate(**entity.to_dict())
 
     def update_one(self, organization_id: UUID, certificate_id: UUID, update: CertificateFields) -> Certificate:
@@ -52,7 +51,7 @@ class CertificateService:
             certificate_repository: CertificateRepository = session.get_repository(CertificateRepository)
             entity = certificate_repository.get_one(organization_id, certificate_id)
             if not entity:
-                raise HTTPException(status_code=404, detail="Certificate not found")
+                raise CertificateNotFoundError()
             entity.organization_identifier = update.organization_identifier
             entity.domain = update.domain
             entity.updated_at = now_utc()
@@ -63,7 +62,7 @@ class CertificateService:
             certificate_repository: CertificateRepository = session.get_repository(CertificateRepository)
             entity = certificate_repository.get_one(organization_id, certificate_id)
             if not entity:
-                raise HTTPException(status_code=404, detail="Certificate not found")
+                raise CertificateNotFoundError()
             now = now_utc()
             entity.updated_at = now
             entity.deleted_at = now

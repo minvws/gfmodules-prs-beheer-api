@@ -2,7 +2,7 @@ import logging
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, Query
 
 from app.container import get_organization_service
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
@@ -26,10 +26,7 @@ def get_by_id(
     service: Annotated[OrganizationService, Depends(get_organization_service)],
 ) -> Organization:
     logger.debug("Fetching organization id=%s", id)
-    result = service.get_one(id)
-    if result is None:
-        raise HTTPException(status_code=404)
-    return result
+    return service.get_one(id)
 
 
 @router.get("", response_model=list[Organization], response_model_exclude_none=True)

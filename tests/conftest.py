@@ -35,6 +35,7 @@ from app.models.client import Client
 from app.models.oin import Oin
 from app.models.organization import Organization
 from app.routers.client import router as client_router
+from app.routers.errors import install_domain_error_handler
 from app.routers.organization import router as organization_router
 from app.routers.resolve import router as resolve_router
 from app.services.certificate import CertificateService
@@ -191,6 +192,7 @@ def mock_organization_service() -> MagicMock:
 def api(mock_client_service: MagicMock, mock_organization_service: MagicMock) -> TestClient:
     app = FastAPI()
     app.exception_handler(RequestValidationError)(request_validation_exception_handler)
+    install_domain_error_handler(app)
     for router in (organization_router, client_router, resolve_router):
         app.include_router(router)
     app.dependency_overrides[get_client_service] = lambda: mock_client_service
