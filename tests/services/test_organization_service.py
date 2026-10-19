@@ -275,18 +275,17 @@ def test_update_one_register_id_conflict_raises_integrity_error(
 def test_update_one_returns_none_when_not_found(
     organization_service: OrganizationService,
 ) -> None:
+    update = OrganizationUpdate(
+        external_id=TEST_OIN,
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+        request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
+        name="first",
+        deleted=False,
+    )
+
     with pytest.raises(OrganizationNotFoundError):
-        organization_service.update_one(
-            uuid4(),
-            OrganizationUpdate(
-                external_id=TEST_OIN,
-                scopes=[AuthorizationScope.ADMINISTRATION],
-                receive_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
-                request_personal_id_types=[PersonalIdType.OPRF, PersonalIdType.REVERSIBLE_PSEUDONYM],
-                name="first",
-                deleted=False,
-            ),
-        )
+        organization_service.update_one(uuid4(), update)
 
 
 def test_get_many_returns_empty_when_none(

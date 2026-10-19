@@ -103,12 +103,10 @@ def test_update_one_when_not_exists(
 ) -> None:
     client_id = persisted_client_entity.id if client_exists else uuid.uuid4()
     organization_id = persisted_client_entity.organization_id if organization_exists else uuid.uuid4()
+    update = ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False)
+
     with pytest.raises(DomainError) as e:
-        client_service.update_one(
-            client_id,
-            organization_id,
-            ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False),
-        )
+        client_service.update_one(client_id, organization_id, update)
     assert isinstance(e.value, OrganizationNotFoundError if client_exists else ClientNotFoundError)
 
 
@@ -178,16 +176,14 @@ def test_update_one_scope_enforcement(
     client_service: ClientService,
     persisted_client_entity: ClientEntity,
 ) -> None:
+    update = ClientUpdate(
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+        deleted=False,
+    )
+
     with pytest.raises(PersonalIdTypesNotInOrganizationError) as e:
-        client_service.update_one(
-            persisted_client_entity.id,
-            persisted_client_entity.organization_id,
-            ClientUpdate(
-                scopes=[AuthorizationScope.ADMINISTRATION],
-                request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
-                deleted=False,
-            ),
-        )
+        client_service.update_one(persisted_client_entity.id, persisted_client_entity.organization_id, update)
     assert e.value.message == "The following Personal id types do not exist in the organization: reversible_pseudonym"
 
 
@@ -256,25 +252,17 @@ def test_resolve(
             deleted=False,
         ),
     )
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=organization_external_id,
+        certificate_domains=certificate_domains,
+        certificate_organization_identifier=str(certificate_organization_identifier),
+    )
     if not resolve_response:
         with pytest.raises(ClientAuthorizationNotFoundError):
-            client_service.resolve(
-                ResolveRequest(
-                    client_id=persisted_client_entity.id,
-                    organization_external_id=organization_external_id,
-                    certificate_domains=certificate_domains,
-                    certificate_organization_identifier=str(certificate_organization_identifier),
-                )
-            )
+            client_service.resolve(request)
     else:
-        resolved = client_service.resolve(
-            ResolveRequest(
-                client_id=persisted_client_entity.id,
-                organization_external_id=organization_external_id,
-                certificate_domains=certificate_domains,
-                certificate_organization_identifier=str(certificate_organization_identifier),
-            )
-        )
+        resolved = client_service.resolve(request)
         assert resolved == resolve_response
 
 
@@ -416,15 +404,14 @@ def test_create_one_should_reject_unusable_certificate(
 ) -> None:
     target_id = _unusable_certificate_id(kind, certificate_service, organization_service, persisted_organization.id)
 
+    create = ClientCreate(
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        request_personal_id_types=[PersonalIdType.OPRF],
+        certificates=[target_id],
+    )
+
     with pytest.raises(CertificatesNotFoundError):
-        client_service.create_one(
-            persisted_organization.id,
-            ClientCreate(
-                scopes=[AuthorizationScope.ADMINISTRATION],
-                request_personal_id_types=[PersonalIdType.OPRF],
-                certificates=[target_id],
-            ),
-        )
+        client_service.create_one(persisted_organization.id, create)
     assert client_service.get_many(persisted_organization.id, ClientQueryParams()) == []
 
 
