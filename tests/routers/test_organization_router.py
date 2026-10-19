@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import OrganizationNotFoundError
 from app.models.organization import OrganizationCreate
 from tests.conftest import FIXED_CREATED_AT, TEST_ORG_NAME, VALID_OIN, make_organization_entity
 
@@ -105,9 +106,10 @@ def test_get_by_id_returns_200(api: TestClient, mock_organization_service: Magic
 
 
 def test_get_by_id_not_found_returns_404(api: TestClient, mock_organization_service: MagicMock) -> None:
-    mock_organization_service.get_one.return_value = None
+    mock_organization_service.get_one.side_effect = OrganizationNotFoundError()
     response = api.get(f"/organizations/{ORG_ID}")
     assert response.status_code == 404
+    assert response.json() == {"detail": "Organization not found"}
 
 
 def test_get_by_id_invalid_uuid_returns_422(api: TestClient) -> None:

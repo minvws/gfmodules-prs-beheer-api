@@ -1,17 +1,26 @@
 import uuid
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from fastapi import HTTPException
 from pytest_mock import MockerFixture
 
 from app.db.models.client import ClientEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.client import ClientRepository
+from app.db.session import DbSession
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import (
+    CertificatesNotFoundError,
+    ClientAuthorizationNotFoundError,
+    ClientNotFoundError,
+    DomainError,
+    OrganizationNotFoundError,
+    PersonalIdTypesNotInOrganizationError,
+)
 from app.models.certificate import CertificateFields
 from app.models.client import (
     ClientCreate,
@@ -21,8 +30,10 @@ from app.models.client import (
     ResolveResponse,
 )
 from app.models.oin import Oin
+from app.models.organization import OrganizationCreate
 from app.services.certificate import CertificateService
 from app.services.client import ClientService
+from app.services.organization import OrganizationService
 from tests.conftest import TEST_EXTERNAL_ID, TEST_OIN, TEST_OIN_2, TEST_ORG_NAME
 
 ALT_OIN = Oin("00000099000000002000")
@@ -65,9 +76,8 @@ def test_get_one_lookup(
         result = client_service.get_one(client_id, organization_id)
         assert result.id == persisted_client_entity.id
     else:
-        with pytest.raises(HTTPException) as e:
+        with pytest.raises(ClientNotFoundError):
             client_service.get_one(client_id, organization_id)
-        assert e.value.status_code == 404
 
 
 def test_update_one(
@@ -93,14 +103,11 @@ def test_update_one_when_not_exists(
 ) -> None:
     client_id = persisted_client_entity.id if client_exists else uuid.uuid4()
     organization_id = persisted_client_entity.organization_id if organization_exists else uuid.uuid4()
-    with pytest.raises(HTTPException) as e:
-        client_service.update_one(
-            client_id,
-            organization_id,
-            ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False),
-        )
-    assert e.value.status_code == 404
-    assert e.value.detail == ("Organization not found" if client_exists else "Client not found")
+    update = ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False)
+
+    with pytest.raises(DomainError) as e:
+        client_service.update_one(client_id, organization_id, update)
+    assert isinstance(e.value, OrganizationNotFoundError if client_exists else ClientNotFoundError)
 
 
 @pytest.mark.parametrize("count", [0, 1, 2])
@@ -151,22 +158,33 @@ def test_get_many_deleted_visibility(
         assert results[0].updated_at == results[0].deleted_at
 
 
+def test_delete_one_keeps_original_deletion_time_when_already_deleted(
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    client_service.delete_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    before = client_service.get_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    client_service.delete_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    after = client_service.get_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+
+    assert before.deleted_at is not None
+    assert after.deleted_at == before.deleted_at
+    assert after.updated_at == before.updated_at
+
+
 def test_update_one_scope_enforcement(
     client_service: ClientService,
     persisted_client_entity: ClientEntity,
 ) -> None:
-    with pytest.raises(HTTPException) as e:
-        client_service.update_one(
-            persisted_client_entity.id,
-            persisted_client_entity.organization_id,
-            ClientUpdate(
-                scopes=[AuthorizationScope.ADMINISTRATION],
-                request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
-                deleted=False,
-            ),
-        )
-    assert e.value.status_code == 404
-    assert e.value.detail == "The following Personal id types do not exist in the organization: reversible_pseudonym"
+    update = ClientUpdate(
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
+        deleted=False,
+    )
+
+    with pytest.raises(PersonalIdTypesNotInOrganizationError) as e:
+        client_service.update_one(persisted_client_entity.id, persisted_client_entity.organization_id, update)
+    assert e.value.message == "The following Personal id types do not exist in the organization: reversible_pseudonym"
 
 
 @pytest.mark.parametrize(
@@ -234,27 +252,17 @@ def test_resolve(
             deleted=False,
         ),
     )
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=organization_external_id,
+        certificate_domains=certificate_domains,
+        certificate_organization_identifier=str(certificate_organization_identifier),
+    )
     if not resolve_response:
-        with pytest.raises(HTTPException) as e:
-            client_service.resolve(
-                ResolveRequest(
-                    client_id=persisted_client_entity.id,
-                    organization_external_id=organization_external_id,
-                    certificate_domains=certificate_domains,
-                    certificate_organization_identifier=str(certificate_organization_identifier),
-                )
-            )
-        assert e.value.status_code == 404
-        assert e.value.detail == "Client authorization does not exist for given parameters"
+        with pytest.raises(ClientAuthorizationNotFoundError):
+            client_service.resolve(request)
     else:
-        resolved = client_service.resolve(
-            ResolveRequest(
-                client_id=persisted_client_entity.id,
-                organization_external_id=organization_external_id,
-                certificate_domains=certificate_domains,
-                certificate_organization_identifier=str(certificate_organization_identifier),
-            )
-        )
+        resolved = client_service.resolve(request)
         assert resolved == resolve_response
 
 
@@ -283,17 +291,15 @@ def test_resolve_should_reject_deleted_certificate(
     _link_certificates(client_service, persisted_client_entity, [certificate.id])
     certificate_service.delete_one(org_id, certificate.id)
 
-    with pytest.raises(HTTPException) as e:
-        client_service.resolve(
-            ResolveRequest(
-                client_id=persisted_client_entity.id,
-                organization_external_id=TEST_EXTERNAL_ID,
-                certificate_domains=["domain.example.com"],
-                certificate_organization_identifier=str(TEST_OIN),
-            )
-        )
-    assert e.value.status_code == 404
-    assert e.value.detail == "Client authorization does not exist for given parameters"
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_domains=["domain.example.com"],
+        certificate_organization_identifier=str(TEST_OIN),
+    )
+
+    with pytest.raises(ClientAuthorizationNotFoundError):
+        client_service.resolve(request)
 
 
 def test_resolve_should_match_active_certificate_when_another_is_deleted(
@@ -332,3 +338,133 @@ def test_resolve_should_match_active_certificate_when_another_is_deleted(
         )
     )
     assert resolved.matched_domain == "active.example.com"
+
+
+def test_resolve_should_reject_client_of_deleted_organization(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    persisted_client_entity: ClientEntity,
+    db_session: DbSession,
+) -> None:
+    org_id = persisted_client_entity.organization_id
+    certificate = certificate_service.create_one(
+        org_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="domain.example.com")
+    )
+    _link_certificates(client_service, persisted_client_entity, [certificate.id])
+    # Deleting an organization with active clients is refused by the service, but may exist from before that check
+    persisted_client_entity.organization.deleted_at = datetime.now(tz=timezone.utc)
+    db_session.commit()
+
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_domains=["domain.example.com"],
+        certificate_organization_identifier=str(TEST_OIN),
+    )
+
+    with pytest.raises(ClientAuthorizationNotFoundError):
+        client_service.resolve(request)
+
+
+def _unusable_certificate_id(
+    kind: str,
+    certificate_service: CertificateService,
+    organization_service: OrganizationService,
+    organization_id: UUID,
+) -> UUID:
+    if kind == "unknown":
+        return uuid4()
+    if kind == "deleted":
+        deleted = certificate_service.create_one(
+            organization_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="deleted.example.com")
+        )
+        certificate_service.delete_one(organization_id, deleted.id)
+        return deleted.id
+    other_org = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN_2,
+            name="Other Organization",
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            receive_personal_id_types=[PersonalIdType.OPRF],
+            request_personal_id_types=[PersonalIdType.OPRF],
+        )
+    )
+    return certificate_service.create_one(
+        other_org.id, CertificateFields(organization_identifier=str(TEST_OIN), domain="other.example.com")
+    ).id
+
+
+@pytest.mark.parametrize("kind", ["unknown", "deleted", "other_organization"])
+def test_create_one_should_reject_unusable_certificate(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    organization_service: OrganizationService,
+    persisted_organization: OrganizationEntity,
+    kind: str,
+) -> None:
+    target_id = _unusable_certificate_id(kind, certificate_service, organization_service, persisted_organization.id)
+
+    create = ClientCreate(
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        request_personal_id_types=[PersonalIdType.OPRF],
+        certificates=[target_id],
+    )
+
+    with pytest.raises(CertificatesNotFoundError):
+        client_service.create_one(persisted_organization.id, create)
+    assert client_service.get_many(persisted_organization.id, ClientQueryParams()) == []
+
+
+@pytest.mark.parametrize("kind", ["unknown", "deleted", "other_organization"])
+def test_update_one_should_reject_unusable_certificate(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    organization_service: OrganizationService,
+    persisted_client_entity: ClientEntity,
+    kind: str,
+) -> None:
+    org_id = persisted_client_entity.organization_id
+    linked = certificate_service.create_one(
+        org_id, CertificateFields(organization_identifier=str(TEST_OIN), domain="linked.example.com")
+    )
+    _link_certificates(client_service, persisted_client_entity, [linked.id])
+    target_id = _unusable_certificate_id(kind, certificate_service, organization_service, org_id)
+
+    with pytest.raises(CertificatesNotFoundError):
+        _link_certificates(client_service, persisted_client_entity, [linked.id, target_id])
+
+    persisted = client_service.get_one(persisted_client_entity.id, org_id)
+    assert persisted.certificates == [linked.id]
+
+
+def test_create_and_update_should_accept_duplicate_certificate_ids(
+    client_service: ClientService,
+    certificate_service: CertificateService,
+    persisted_organization: OrganizationEntity,
+) -> None:
+    certificate = certificate_service.create_one(
+        persisted_organization.id,
+        CertificateFields(organization_identifier=str(TEST_OIN), domain="domain.example.com"),
+    )
+
+    created = client_service.create_one(
+        persisted_organization.id,
+        ClientCreate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            certificates=[certificate.id, certificate.id],
+        ),
+    )
+    assert created.certificates == [certificate.id]
+
+    updated = client_service.update_one(
+        created.id,
+        persisted_organization.id,
+        ClientUpdate(
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.OPRF],
+            certificates=[certificate.id, certificate.id],
+            deleted=False,
+        ),
+    )
+    assert updated.certificates == [certificate.id]

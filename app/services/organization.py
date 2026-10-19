@@ -2,14 +2,18 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import HTTPException
-
 from app.db.db import Database
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.models.organization import OrganizationEntity
 from app.db.repository.organization import OrganizationRepository
 from app.db.repository.personal_id_type import PersonalIdTypeRepository
 from app.db.repository.scope import ScopeRepository
+from app.exceptions import (
+    OrganizationHasActiveClientsError,
+    OrganizationNotFoundError,
+    PersonalIdTypesNotFoundError,
+    ScopesNotFoundError,
+)
 from app.models.oin import Oin
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.utils.datetime import now_utc
@@ -31,14 +35,14 @@ class OrganizationService:
             )
             scopes = scope_repo.get_many(input.scopes)
             if len(scopes) != len(input.scopes):
-                raise HTTPException(status_code=404, detail="Not all of provided scopes exists")
+                raise ScopesNotFoundError()
             if len(receive_personal_id_types) != len(input.receive_personal_id_types):
-                raise HTTPException(status_code=404, detail="Not all of provided receive personal_id_types exists")
+                raise PersonalIdTypesNotFoundError("Not all of provided receive personal_id_types exists")
             request_personal_id_types = personal_id_type_repo.get_many(
                 [str(e) for e in input.request_personal_id_types]
             )
             if len(request_personal_id_types) != len(input.request_personal_id_types):
-                raise HTTPException(status_code=404, detail="Not all of provided request personal_id_types exists")
+                raise PersonalIdTypesNotFoundError("Not all of provided request personal_id_types exists")
             entity: OrganizationEntity = repo.add_one(
                 OrganizationEntity(
                     external_id=input.external_id,
@@ -62,7 +66,7 @@ class OrganizationService:
             repo = session.get_repository(OrganizationRepository)
             entity = repo.get_one(id)
             if not entity:
-                raise HTTPException(status_code=404, detail="Organization not found")
+                raise OrganizationNotFoundError()
             return Organization(**entity.to_dict())
 
     def get_many(
@@ -85,7 +89,9 @@ class OrganizationService:
             organization_entity = repo.get_one(id)
             if not organization_entity:
                 logger.debug("Organization not found for update id=%s", id)
-                raise HTTPException(status_code=404, detail="Organization not found")
+                raise OrganizationNotFoundError()
+            if not organization_entity.deleted_at and organization_update.deleted:
+                self._assert_no_active_clients(organization_entity)
             now = datetime.now(timezone.utc)
             organization_entity.external_id = organization_update.external_id
             organization_entity.name = organization_update.name
@@ -97,15 +103,15 @@ class OrganizationService:
 
             scopes = scope_repo.get_many(organization_update.scopes)
             if len(scopes) != len(organization_update.scopes):
-                raise HTTPException(status_code=404, detail="Not all of provided scopes exists")
+                raise ScopesNotFoundError()
 
             receive_personal_id_types = personal_id_type_repo.get_many(organization_update.receive_personal_id_types)
             if len(receive_personal_id_types) != len(organization_update.receive_personal_id_types):
-                raise HTTPException(status_code=404, detail="Not all of provided receive personal_id_types exists")
+                raise PersonalIdTypesNotFoundError("Not all of provided receive personal_id_types exists")
 
             request_personal_id_types = personal_id_type_repo.get_many(organization_update.request_personal_id_types)
             if len(request_personal_id_types) != len(organization_update.request_personal_id_types):
-                raise HTTPException(status_code=404, detail="Not all of provided request personal_id_types exists")
+                raise PersonalIdTypesNotFoundError("Not all of provided request personal_id_types exists")
 
             organization_entity.scopes = list(scopes)
             organization_entity.receive_personal_id_types = list(receive_personal_id_types)
@@ -119,11 +125,17 @@ class OrganizationService:
             entity = repo.get_one(id)
             if not entity:
                 logger.debug("Organization not found for update id=%s", id)
-                raise HTTPException(status_code=404)
-            if [client for client in entity.clients if client.deleted_at is None]:
-                logger.debug("Organization still has active clients")
-                raise HTTPException(status_code=403, detail="Organization still has active clients")
+                raise OrganizationNotFoundError()
+            if entity.deleted_at is not None:
+                return Organization(**entity.to_dict())
+            self._assert_no_active_clients(entity)
             entity.updated_at = entity.deleted_at = datetime.now(tz=timezone.utc)
             ret_value = Organization(**entity.to_dict())
             session.commit()
             return ret_value
+
+    @staticmethod
+    def _assert_no_active_clients(entity: OrganizationEntity) -> None:
+        if [client for client in entity.clients if client.deleted_at is None]:
+            logger.debug("Organization still has active clients")
+            raise OrganizationHasActiveClientsError()
