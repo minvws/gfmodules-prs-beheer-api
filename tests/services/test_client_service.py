@@ -287,15 +287,15 @@ def test_resolve_should_reject_deleted_certificate(
     _link_certificates(client_service, persisted_client_entity, [certificate.id])
     certificate_service.delete_one(org_id, certificate.id)
 
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_domains=["domain.example.com"],
+        certificate_organization_identifier=str(TEST_OIN),
+    )
+
     with pytest.raises(HTTPException) as e:
-        client_service.resolve(
-            ResolveRequest(
-                client_id=persisted_client_entity.id,
-                organization_external_id=TEST_EXTERNAL_ID,
-                certificate_domains=["domain.example.com"],
-                certificate_organization_identifier=str(TEST_OIN),
-            )
-        )
+        client_service.resolve(request)
     assert e.value.status_code == 404
     assert e.value.detail == "Client authorization does not exist for given parameters"
 
@@ -353,15 +353,15 @@ def test_resolve_should_reject_client_of_deleted_organization(
     persisted_client_entity.organization.deleted_at = datetime.now(tz=timezone.utc)
     db_session.commit()
 
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_domains=["domain.example.com"],
+        certificate_organization_identifier=str(TEST_OIN),
+    )
+
     with pytest.raises(HTTPException) as e:
-        client_service.resolve(
-            ResolveRequest(
-                client_id=persisted_client_entity.id,
-                organization_external_id=TEST_EXTERNAL_ID,
-                certificate_domains=["domain.example.com"],
-                certificate_organization_identifier=str(TEST_OIN),
-            )
-        )
+        client_service.resolve(request)
     assert e.value.status_code == 404
     assert e.value.detail == "Client authorization does not exist for given parameters"
 
@@ -404,15 +404,14 @@ def test_create_one_should_reject_unusable_certificate(
 ) -> None:
     target_id = _unusable_certificate_id(kind, certificate_service, organization_service, persisted_organization.id)
 
+    create = ClientCreate(
+        scopes=[AuthorizationScope.ADMINISTRATION],
+        request_personal_id_types=[PersonalIdType.OPRF],
+        certificates=[target_id],
+    )
+
     with pytest.raises(HTTPException) as e:
-        client_service.create_one(
-            persisted_organization.id,
-            ClientCreate(
-                scopes=[AuthorizationScope.ADMINISTRATION],
-                request_personal_id_types=[PersonalIdType.OPRF],
-                certificates=[target_id],
-            ),
-        )
+        client_service.create_one(persisted_organization.id, create)
     assert e.value.status_code == 404
     assert e.value.detail == "Not all requested certificates exists"
     assert client_service.get_many(persisted_organization.id, ClientQueryParams()) == []
