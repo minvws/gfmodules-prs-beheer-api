@@ -371,9 +371,10 @@ def test_update_one_delete_blocked_when_client_exists(
     persisted_client_entity: ClientEntity,
 ) -> None:
     organization = persisted_client_entity.organization
+    update = _deleted_update(organization)
 
     with pytest.raises(OrganizationHasActiveClientsError):
-        organization_service.update_one(organization.id, _deleted_update(organization))
+        organization_service.update_one(organization.id, update)
 
     persisted = organization_service.get_one(organization.id)
     assert persisted.deleted_at is None

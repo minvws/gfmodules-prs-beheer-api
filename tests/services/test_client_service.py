@@ -303,15 +303,15 @@ def test_resolve_should_reject_deleted_certificate(
     _link_certificates(client_service, persisted_client_entity, [certificate.id])
     certificate_service.delete_one(org_id, certificate.id)
 
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_domains=["domain.example.com"],
+        certificate_organization_identifier=str(TEST_OIN),
+    )
+
     with pytest.raises(ClientAuthorizationNotFoundError):
-        client_service.resolve(
-            ResolveRequest(
-                client_id=persisted_client_entity.id,
-                organization_external_id=TEST_EXTERNAL_ID,
-                certificate_domains=["domain.example.com"],
-                certificate_organization_identifier=str(TEST_OIN),
-            )
-        )
+        client_service.resolve(request)
 
 
 def test_resolve_should_match_active_certificate_when_another_is_deleted(
@@ -367,15 +367,15 @@ def test_resolve_should_reject_client_of_deleted_organization(
     persisted_client_entity.organization.deleted_at = datetime.now(tz=timezone.utc)
     db_session.commit()
 
+    request = ResolveRequest(
+        client_id=persisted_client_entity.id,
+        organization_external_id=TEST_EXTERNAL_ID,
+        certificate_domains=["domain.example.com"],
+        certificate_organization_identifier=str(TEST_OIN),
+    )
+
     with pytest.raises(ClientAuthorizationNotFoundError):
-        client_service.resolve(
-            ResolveRequest(
-                client_id=persisted_client_entity.id,
-                organization_external_id=TEST_EXTERNAL_ID,
-                certificate_domains=["domain.example.com"],
-                certificate_organization_identifier=str(TEST_OIN),
-            )
-        )
+        client_service.resolve(request)
 
 
 def _unusable_certificate_id(
