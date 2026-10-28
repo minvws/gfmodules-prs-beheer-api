@@ -53,10 +53,10 @@ curl 'https://example.com/organizations' \
     "prs:saml-pseudonym"
   ],
   "receive_personal_id_types": [
-    "oprf", "reversible_pseudonym", "irreversible_pseudonym"
+    "oprf", "reversible_pseudonym", "irreversible_pseudonym", "personal_id"
   ],
   "request_personal_id_types": [
-    "oprf", "reversible_pseudonym", "irreversible_pseudonym"
+    "oprf", "reversible_pseudonym", "irreversible_pseudonym", "personal_id"
   ]
 }'
 ```
@@ -98,7 +98,7 @@ curl 'https://example.com/organizations/6054e0f0-7147-43db-816a-3a850c03b0ac/cli
     "prs:saml-pseudonym"
   ],
   "request_personal_id_types": [
-    "oprf", "reversible_pseudonym", "irreversible_pseudonym"
+    "oprf", "reversible_pseudonym", "irreversible_pseudonym", "personal_id"
   ],
   "certificates": ["84e343df-a42d-4866-accc-43e37d212288"]
 }'
