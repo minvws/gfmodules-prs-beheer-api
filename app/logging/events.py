@@ -77,6 +77,12 @@ class Log(_Base):
             _SIEM: ("error_reason",),
         },
     )
+    HEALTH_UNHEALTHY = LogEvent(  # PRS-HEALTH-001
+        "270400",
+        logging.ERROR,
+        (_APP, _SIEM),
+        {_APP: ("component", "status", "error_detail"), _SIEM: ("component", "status")},
+    )
     SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("270401")  # PRS-SYS-001
     SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("270402")  # PRS-SYS-002
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("270402")  # PRS-SYS-002

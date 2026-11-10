@@ -32,6 +32,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `CLIENT_WITHDRAWN` | 260403 | WARNING | `acting_organization_identifiers`, `organization_identifier`, `deactivated_by`, `reason` |
 | `SCOPES_CHANGED` | 260404 | WARNING | `organization_identifier`, `acting_organization_identifiers`, `changed_scopes`, `changed_by` |
 | `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `error_reason` |
+| `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status`, `error_detail` |
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason`, `last_exception_type` |
@@ -49,6 +50,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `CLIENT_WITHDRAWN` | 260403 | WARNING | `acting_organization_identifiers`, `deactivated_by` |
 | `SCOPES_CHANGED` | 260404 | WARNING | `organization_identifier`, `acting_organization_identifiers`, `changed_by` |
 | `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `error_reason` |
+| `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
