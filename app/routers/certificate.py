@@ -7,10 +7,15 @@ from fastapi.params import Query
 
 from app.container import get_certificate_service
 from app.models.certificate import Certificate, CertificateFields, CertificateQueryParams
+from app.routers.context import organization_in_context
 from app.services.certificate import CertificateService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/organizations/{organization_id}/certificates", tags=["Certificates"])
+router = APIRouter(
+    prefix="/organizations/{organization_id}/certificates",
+    dependencies=[Depends(organization_in_context)],
+    tags=["Certificates"],
+)
 
 
 @router.post(

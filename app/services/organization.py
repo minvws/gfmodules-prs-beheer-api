@@ -2,6 +2,8 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
+import gfmodules.logging as gflog
+
 from app.db.db import Database
 from app.db.models.hsm_key_versions import HsmKeyVersionEntity
 from app.db.models.organization import OrganizationEntity
@@ -61,6 +63,7 @@ class OrganizationService:
             )
             session.flush()
             organization = Organization(**entity.to_dict())
+        gflog.set_context({"organization_id": str(organization.id)})
         audit.organization_registered(organization)
         return organization
 
