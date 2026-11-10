@@ -63,11 +63,9 @@ def test_create_one_duplicate_name_should_raise(
     client_service: ClientService,
     persisted_client_entity: ClientEntity,
 ) -> None:
+    create = ClientCreate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[])
     with pytest.raises(ClientNameAlreadyExistsError):
-        client_service.create_one(
-            persisted_client_entity.organization_id,
-            ClientCreate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[]),
-        )
+        client_service.create_one(persisted_client_entity.organization_id, create)
 
 
 def test_create_one_name_of_deleted_client_should_raise(
@@ -75,11 +73,9 @@ def test_create_one_name_of_deleted_client_should_raise(
     persisted_client_entity: ClientEntity,
 ) -> None:
     client_service.delete_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    create = ClientCreate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[])
     with pytest.raises(ClientNameAlreadyExistsError):
-        client_service.create_one(
-            persisted_client_entity.organization_id,
-            ClientCreate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[]),
-        )
+        client_service.create_one(persisted_client_entity.organization_id, create)
 
 
 def test_update_one_to_name_of_other_client_should_raise(
@@ -90,12 +86,9 @@ def test_update_one_to_name_of_other_client_should_raise(
         persisted_client_entity.organization_id,
         ClientCreate(name="Other Client", scopes=[], request_personal_id_types=[]),
     )
+    update = ClientUpdate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[], deleted=False)
     with pytest.raises(ClientNameAlreadyExistsError):
-        client_service.update_one(
-            other.id,
-            other.organization_id,
-            ClientUpdate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[], deleted=False),
-        )
+        client_service.update_one(other.id, other.organization_id, update)
     assert client_service.get_one(other.id, other.organization_id).name == "Other Client"
 
 
