@@ -21,6 +21,7 @@ from app.exceptions import (
     PersonalIdTypesNotInOrganizationError,
     ScopesNotInOrganizationError,
 )
+from app.logging import audit
 from app.models.client import (
     Client,
     ClientCreate,
@@ -105,7 +106,10 @@ class ClientService:
             )
             entity = repo.add_one(entity)
             session.commit()
-            return Client(**entity.to_dict())
+            client = Client(**entity.to_dict())
+            audited = audit.AuditedClient.of(organization.external_id, certificates, input.scopes, None)
+        audit.client_registered(audited)
+        return client
 
     def get_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
@@ -148,6 +152,12 @@ class ClientService:
             if repo.name_exists(organization_id, update.name, exclude_id=client_entity.id):
                 logger.debug("Client name already in use by another client")
                 raise ClientNameAlreadyExistsError()
+            before = audit.AuditedClient.of(
+                organization.external_id,
+                client_entity.certificates,
+                [client_scope.scope.name for client_scope in client_entity.scopes],
+                client_entity.deleted_at,
+            )
             now = datetime.now(UTC)
             client_entity.updated_at = now
             client_entity.name = update.name
@@ -170,7 +180,10 @@ class ClientService:
                 if rpit.name in update.request_personal_id_types
             ]
             client_entity.request_personal_id_types = updated
-            return Client(**client_entity.to_dict())
+            client = Client(**client_entity.to_dict())
+            after = audit.AuditedClient.of(organization.external_id, certificates, update.scopes, client.deleted_at)
+        audit.client_updated(before, after)
+        return client
 
     def delete_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
@@ -183,7 +196,15 @@ class ClientService:
                 return Client(**client_entity.to_dict())
             client_entity.deleted_at = client_entity.updated_at = datetime.now(tz=UTC)
             session.commit()
-            return Client(**client_entity.to_dict())
+            client = Client(**client_entity.to_dict())
+            audited = audit.AuditedClient.of(
+                client_entity.organization.external_id,
+                client_entity.certificates,
+                client.scopes,
+                client.deleted_at,
+            )
+        audit.client_withdrawn(audited)
+        return client
 
     def resolve(self, resolve_request: ResolveRequest) -> ResolveResponse:
         with self.db.get_db_session() as session:
