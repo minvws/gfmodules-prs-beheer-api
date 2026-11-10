@@ -24,6 +24,7 @@ class TestCatalogue:
             ("CLIENT_WITHDRAWN", "260403"),
             ("SCOPES_CHANGED", "260404"),
             ("ONBOARDING_VALIDATION_FAILED", "260405"),
+            ("HEALTH_UNHEALTHY", "270400"),
             ("SYS_APP_STARTED", "270401"),
             ("SYS_APP_STOPPED", "270402"),
             ("SYS_APP_CRASHED", "270402"),
