@@ -48,17 +48,17 @@ class TestOrganizationRegistered:
         return route(
             Log.ORGANIZATION_REGISTERED,
             "registered",
-            organisatie_oin=_ORGANISATIE_OIN,
-            bevoegdheden="read write",
+            organization_identifier=_ORGANISATIE_OIN,
+            scopes="read write",
         )
 
     def test_both_streams_receive_the_organisatie_oin(self, routed: Routed) -> None:
-        assert routed[LoggingStreams.APP][0]["organisatie_oin"] == _ORGANISATIE_OIN
-        assert routed[LoggingStreams.SIEM][0]["organisatie_oin"] == _ORGANISATIE_OIN
+        assert routed[LoggingStreams.APP][0]["organization_identifier"] == _ORGANISATIE_OIN
+        assert routed[LoggingStreams.SIEM][0]["organization_identifier"] == _ORGANISATIE_OIN
 
     def test_siem_does_not_receive_the_bevoegdheden(self, routed: Routed) -> None:
-        assert routed[LoggingStreams.APP][0]["bevoegdheden"] == "read write"
-        assert_fields_absent(routed[LoggingStreams.SIEM], "bevoegdheden")
+        assert routed[LoggingStreams.APP][0]["scopes"] == "read write"
+        assert_fields_absent(routed[LoggingStreams.SIEM], "scopes")
 
     def test_public_inspect_receives_nothing(self, routed: Routed) -> None:
         assert routed[LoggingStreams.PUBLIC_INSPECT] == []
@@ -123,7 +123,7 @@ class TestAccessRequest:
 
 class TestCorrelationMetadata:
     def test_is_retained_in_every_routed_stream(self, route: Route) -> None:
-        routed = route(Log.ORGANIZATION_REGISTERED, "registered", organisatie_oin=_ORGANISATIE_OIN)
+        routed = route(Log.ORGANIZATION_REGISTERED, "registered", organization_identifier=_ORGANISATIE_OIN)
 
         for stream in (LoggingStreams.APP, LoggingStreams.SIEM):
             message = routed[stream][0]
