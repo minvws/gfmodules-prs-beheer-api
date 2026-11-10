@@ -31,7 +31,7 @@ class ClientNotFoundError(DomainError):
 
 
 class ClientNameAlreadyExistsError(DomainError):
-    """Client names are unique across all clients, including deleted ones."""
+    """Client names are unique within an organization, including deleted clients."""
 
     message = "Client name already exists"
 

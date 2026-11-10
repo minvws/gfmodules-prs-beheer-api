@@ -68,6 +68,28 @@ def test_create_one_duplicate_name_should_raise(
         client_service.create_one(persisted_client_entity.organization_id, create)
 
 
+def test_create_one_same_name_in_other_organization_should_succeed(
+    client_service: ClientService,
+    organization_service: OrganizationService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    other_org = organization_service.create_one(
+        OrganizationCreate(
+            external_id=TEST_OIN_2,
+            name="Other Organization",
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            receive_personal_id_types=[PersonalIdType.OPRF],
+            request_personal_id_types=[PersonalIdType.OPRF],
+        )
+    )
+    result = client_service.create_one(
+        other_org.id,
+        ClientCreate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[]),
+    )
+    assert result.organization_id == other_org.id
+    assert result.name == persisted_client_entity.name
+
+
 def test_create_one_name_of_deleted_client_should_raise(
     client_service: ClientService,
     persisted_client_entity: ClientEntity,

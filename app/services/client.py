@@ -81,7 +81,7 @@ class ClientService:
             certificates = self._get_certificates(session, organization_id, input.certificates)
 
             repo = session.get_repository(ClientRepository)
-            if repo.name_exists(input.name):
+            if repo.name_exists(organization_id, input.name):
                 logger.debug("Client name already in use")
                 raise ClientNameAlreadyExistsError()
             entity = ClientEntity(
@@ -145,7 +145,7 @@ class ClientService:
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
                 raise ClientNotFoundError()
-            if repo.name_exists(update.name, exclude_id=client_entity.id):
+            if repo.name_exists(organization_id, update.name, exclude_id=client_entity.id):
                 logger.debug("Client name already in use by another client")
                 raise ClientNameAlreadyExistsError()
             now = datetime.now(timezone.utc)
