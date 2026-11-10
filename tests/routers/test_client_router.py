@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
+from app.exceptions import ClientNameAlreadyExistsError
 from app.models.client import ClientCreate, ClientQueryParams, ClientUpdate
 from tests.conftest import CERTIFICATE_ID, FIXED_CREATED_AT, make_client_entity
 
@@ -33,6 +34,7 @@ def test_register_returns_201(
     mock_client_service.create_one.return_value = entity
 
     body = {
+        "name": "Test Client",
         "scopes": ["prs:administration"],
         "request_personal_id_types": ["oprf"],
         "certificates": [str(CERTIFICATE_ID)],
@@ -47,6 +49,7 @@ def test_register_returns_201(
         "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "certificates": [str(CERTIFICATE_ID)],
+        "name": "Test Client",
         "scopes": ["prs:administration"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
@@ -54,6 +57,7 @@ def test_register_returns_201(
     mock_client_service.create_one.assert_called_once_with(
         UUID(ORG_ID),
         ClientCreate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[CERTIFICATE_ID],
@@ -143,6 +147,7 @@ def test_update_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
     entity = make_client_entity(organization_id=UUID(ORG_ID))
     mock_client_service.update_one.return_value = entity
     body = {
+        "name": "Test Client",
         "scopes": ["prs:administration"],
         "request_personal_id_types": ["oprf"],
         "certificates": [],
@@ -156,6 +161,7 @@ def test_update_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
         "created_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "certificates": [str(CERTIFICATE_ID)],
+        "name": "Test Client",
         "scopes": ["prs:administration"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
@@ -164,6 +170,7 @@ def test_update_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
         entity.id,
         UUID(ORG_ID),
         ClientUpdate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[],
@@ -189,7 +196,32 @@ def test_delete_returns_200(api: TestClient, mock_client_service: MagicMock) -> 
         "updated_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "deleted_at": FIXED_CREATED_AT.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "certificates": [str(CERTIFICATE_ID)],
+        "name": "Test Client",
         "scopes": ["prs:administration"],
         "request_personal_id_types": ["reversible_pseudonym"],
     }
     mock_client_service.delete_one.assert_called_once_with(UUID(CLIENT_ID), UUID(ORG_ID))
+
+
+@pytest.mark.parametrize("name", [None, "", "   ", "x" * 256])
+def test_register_invalid_name_returns_422(api: TestClient, mock_client_service: MagicMock, name: object) -> None:
+    body: dict[str, object] = {"scopes": ["prs:administration"], "request_personal_id_types": ["oprf"]}
+    if name is not None:
+        body["name"] = name
+    response = api.post(BASE, json=body)
+    assert response.status_code == 422
+    mock_client_service.create_one.assert_not_called()
+
+
+def test_update_missing_name_returns_422(api: TestClient, mock_client_service: MagicMock) -> None:
+    body = {"scopes": ["prs:administration"], "request_personal_id_types": ["oprf"], "deleted": False}
+    response = api.put(f"{BASE}/{CLIENT_ID}", json=body)
+    assert response.status_code == 422
+    mock_client_service.update_one.assert_not_called()
+
+
+def test_register_duplicate_name_returns_409(api: TestClient, mock_client_service: MagicMock) -> None:
+    mock_client_service.create_one.side_effect = ClientNameAlreadyExistsError()
+    body = {"name": "Taken", "scopes": ["prs:administration"], "request_personal_id_types": ["oprf"]}
+    response = api.post(BASE, json=body)
+    assert response.status_code == 409

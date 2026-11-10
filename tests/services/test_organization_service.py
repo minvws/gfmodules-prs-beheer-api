@@ -183,6 +183,7 @@ def test_update_one_scope_removal_blocked_when_used_by_client(
     created_client = client_service.create_one(
         created.id,
         ClientCreate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
         ),
@@ -216,6 +217,7 @@ def test_update_one_scope_removal_blocked_when_used_by_client(
         persisted_client.id,
         persisted.id,
         ClientUpdate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[],
             deleted=False,

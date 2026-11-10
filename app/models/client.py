@@ -1,6 +1,7 @@
+from typing import Annotated
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from app.enums.authorization_scope import AuthorizationScope
 from app.enums.personal_id_type import PersonalIdType
@@ -12,11 +13,16 @@ ORGANIZATION_IDENTIFIER_DESCRIPTION = "The organization_identifier of the client
 EXTERNAL_ID_DESCRIPTION = "The external_id of the Client. Currently limited and transformed to OIN"
 CLIENT_ID_DESCRIPTION = "The assigned id of the Cient."
 ORGANIZATION_NAME_DESCRIPTION = "The name of the organization the client acts on behalf of"
+CLIENT_NAME_DESCRIPTION = "The human-readable name of the client"
+CLIENT_NAME_MAX_LENGTH = 255
 MATCHED_DOMAIN_DESCRIPTION = "The registered domain that matched one of the presented certificate_domains"
 
 
 class ClientFields(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=CLIENT_NAME_MAX_LENGTH)] = (
+        Field(description=CLIENT_NAME_DESCRIPTION, examples=["ClientName"])
+    )
     scopes: list[AuthorizationScope] = Field(examples=[[AuthorizationScope.ADMINISTRATION]])
     request_personal_id_types: list[PersonalIdType] = Field(examples=[[PersonalIdType.OPRF]])
     certificates: list[UUID] = []

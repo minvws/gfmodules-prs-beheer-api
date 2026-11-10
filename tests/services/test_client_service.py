@@ -16,6 +16,7 @@ from app.enums.personal_id_type import PersonalIdType
 from app.exceptions import (
     CertificatesNotFoundError,
     ClientAuthorizationNotFoundError,
+    ClientNameAlreadyExistsError,
     ClientNotFoundError,
     DomainError,
     OrganizationNotFoundError,
@@ -47,12 +48,81 @@ def test_create_one_should_succeed(
     result = client_service.create_one(
         persisted_organization.id,
         ClientCreate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
         ),
     )
     assert isinstance(result.id, UUID)
     assert result.organization_id == persisted_organization.id
+    assert result.name == "Test Client"
+    assert client_service.get_one(result.id, persisted_organization.id).name == "Test Client"
+
+
+def test_create_one_duplicate_name_should_raise(
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    with pytest.raises(ClientNameAlreadyExistsError):
+        client_service.create_one(
+            persisted_client_entity.organization_id,
+            ClientCreate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[]),
+        )
+
+
+def test_create_one_name_of_deleted_client_should_raise(
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    client_service.delete_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    with pytest.raises(ClientNameAlreadyExistsError):
+        client_service.create_one(
+            persisted_client_entity.organization_id,
+            ClientCreate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[]),
+        )
+
+
+def test_update_one_to_name_of_other_client_should_raise(
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    other = client_service.create_one(
+        persisted_client_entity.organization_id,
+        ClientCreate(name="Other Client", scopes=[], request_personal_id_types=[]),
+    )
+    with pytest.raises(ClientNameAlreadyExistsError):
+        client_service.update_one(
+            other.id,
+            other.organization_id,
+            ClientUpdate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[], deleted=False),
+        )
+    assert client_service.get_one(other.id, other.organization_id).name == "Other Client"
+
+
+def test_update_one_keeping_own_name_should_succeed(
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    result = client_service.update_one(
+        persisted_client_entity.id,
+        persisted_client_entity.organization_id,
+        ClientUpdate(name=persisted_client_entity.name, scopes=[], request_personal_id_types=[], deleted=False),
+    )
+    assert result.name == persisted_client_entity.name
+
+
+def test_update_one_should_change_name(
+    client_service: ClientService,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    result = client_service.update_one(
+        persisted_client_entity.id,
+        persisted_client_entity.organization_id,
+        ClientUpdate(name="Renamed Client", scopes=[], request_personal_id_types=[], deleted=False),
+    )
+    assert result.name == "Renamed Client"
+    fetched = client_service.get_one(persisted_client_entity.id, persisted_client_entity.organization_id)
+    assert fetched.name == "Renamed Client"
 
 
 @pytest.mark.parametrize(
@@ -87,7 +157,9 @@ def test_update_one(
     result = client_service.update_one(
         persisted_client_entity.id,
         persisted_client_entity.organization_id,
-        ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False),
+        ClientUpdate(
+            name="Test Client", scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False
+        ),
     )
     assert result is not None
     assert result.id == persisted_client_entity.id
@@ -103,7 +175,9 @@ def test_update_one_when_not_exists(
 ) -> None:
     client_id = persisted_client_entity.id if client_exists else uuid.uuid4()
     organization_id = persisted_client_entity.organization_id if organization_exists else uuid.uuid4()
-    update = ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False)
+    update = ClientUpdate(
+        name="Test Client", scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[], deleted=False
+    )
 
     with pytest.raises(DomainError) as e:
         client_service.update_one(client_id, organization_id, update)
@@ -116,10 +190,14 @@ def test_get_many_returns_active_clients(
     persisted_organization: OrganizationEntity,
     count: int,
 ) -> None:
-    for _ in range(count):
+    for i in range(count):
         client_service.create_one(
             persisted_organization.id,
-            ClientCreate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[PersonalIdType.OPRF]),
+            ClientCreate(
+                name=f"Test Client {i}",
+                scopes=[AuthorizationScope.ADMINISTRATION],
+                request_personal_id_types=[PersonalIdType.OPRF],
+            ),
         )
     assert len(client_service.get_many(persisted_organization.id, ClientQueryParams())) == count
 
@@ -141,12 +219,18 @@ def test_get_many_deleted_visibility(
 ) -> None:
     created = client_service.create_one(
         persisted_organization.id,
-        ClientCreate(scopes=[AuthorizationScope.ADMINISTRATION], request_personal_id_types=[PersonalIdType.OPRF]),
+        ClientCreate(
+            name="Test Client",
+            scopes=[AuthorizationScope.ADMINISTRATION],
+            request_personal_id_types=[PersonalIdType.OPRF],
+        ),
     )
     client_service.update_one(
         created.id,
         persisted_organization.id,
-        ClientUpdate(scopes=[AuthorizationScope.ADMINISTRATION], deleted=True, request_personal_id_types=[]),
+        ClientUpdate(
+            name="Test Client", scopes=[AuthorizationScope.ADMINISTRATION], deleted=True, request_personal_id_types=[]
+        ),
     )
     results = client_service.get_many(
         persisted_organization.id,
@@ -177,6 +261,7 @@ def test_update_one_scope_enforcement(
     persisted_client_entity: ClientEntity,
 ) -> None:
     update = ClientUpdate(
+        name="Test Client",
         scopes=[AuthorizationScope.ADMINISTRATION],
         request_personal_id_types=[PersonalIdType.REVERSIBLE_PSEUDONYM],
         deleted=False,
@@ -246,6 +331,7 @@ def test_resolve(
         persisted_client_entity.id,
         persisted_client_entity.organization_id,
         ClientUpdate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[certificate.id],
@@ -271,6 +357,7 @@ def _link_certificates(client_service: ClientService, client: ClientEntity, cert
         client.id,
         client.organization_id,
         ClientUpdate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=certificate_ids,
@@ -405,6 +492,7 @@ def test_create_one_should_reject_unusable_certificate(
     target_id = _unusable_certificate_id(kind, certificate_service, organization_service, persisted_organization.id)
 
     create = ClientCreate(
+        name="Test Client",
         scopes=[AuthorizationScope.ADMINISTRATION],
         request_personal_id_types=[PersonalIdType.OPRF],
         certificates=[target_id],
@@ -450,6 +538,7 @@ def test_create_and_update_should_accept_duplicate_certificate_ids(
     created = client_service.create_one(
         persisted_organization.id,
         ClientCreate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[certificate.id, certificate.id],
@@ -461,6 +550,7 @@ def test_create_and_update_should_accept_duplicate_certificate_ids(
         created.id,
         persisted_organization.id,
         ClientUpdate(
+            name="Test Client",
             scopes=[AuthorizationScope.ADMINISTRATION],
             request_personal_id_types=[PersonalIdType.OPRF],
             certificates=[certificate.id, certificate.id],

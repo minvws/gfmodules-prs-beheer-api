@@ -140,6 +140,7 @@ def organization_entity() -> OrganizationEntity:
 @pytest.fixture()
 def client_entity(persisted_organization: OrganizationEntity) -> ClientEntity:
     return ClientEntity(
+        name="Test Client",
         organization_id=persisted_organization.id,
         request_personal_id_types=[
             ClientPersonalIdTypeEntity(
@@ -238,6 +239,7 @@ def make_client_entity(
 ) -> Client:
     return Client(
         id=id or uuid4(),
+        name="Test Client",
         organization_id=organization_id or uuid4(),
         scopes=scopes,
         request_personal_id_types=request_personal_id_types,
