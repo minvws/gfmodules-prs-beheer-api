@@ -36,6 +36,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason`, `last_exception_type` |
+| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `error_type`, `retry_attempt`, `backoff_seconds` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
 | `SYS_MISSING_CORRELATION_ID` | 270428 | ERROR | `endpoint`, `method` |
 | `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated` |
@@ -53,6 +54,7 @@ Every event carries these on every stream, whenever the request context holds a 
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason` |
+| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `error_type` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
 
 ## Access event ids per route

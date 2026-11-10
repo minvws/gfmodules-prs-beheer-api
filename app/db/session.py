@@ -3,8 +3,9 @@ import random
 from collections.abc import Callable
 from time import sleep
 from types import TracebackType
-from typing import Any, ParamSpec, TypeVar
+from typing import Any, NoReturn, ParamSpec, TypeVar
 
+import gfmodules.logging as gflog
 from sqlalchemy import Delete, Engine, Insert, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from typing_extensions import Self
 
 from app.db.models.base import Base
 from app.db.repository import base
+from app.logging.events import Log
 
 """
 This module contains the DbSession class, which is a context manager that provides a session to interact with
@@ -178,14 +180,25 @@ class DbSession:
         """
         try:
             return f(*args, **kwargs)
-        except (OperationalError, PendingRollbackError) as e:
-            logger.error("Transaction failed, discarding its pending work: %s", e)
-            self.session.rollback()
-            raise DatabaseError("Transaction failed, nothing was committed", None, e) from e
+        except OperationalError as e:
+            gflog.emit(
+                logger,
+                Log.SYS_DB_CONNECTION_FAILED,
+                "Database connection failed, discarding the pending work",
+                fields={"error_type": type(e).__name__},
+            )
+            self._discard(e)
+        except PendingRollbackError as e:
+            logger.exception("Transaction failed, discarding its pending work")
+            self._discard(e)
         except Exception:
             logger.exception("Unexpected error during transaction, discarding its pending work")
             self.session.rollback()
             raise
+
+    def _discard(self, cause: Exception) -> NoReturn:
+        self.session.rollback()
+        raise DatabaseError("Transaction failed, nothing was committed", None, cause) from cause
 
     def _retry(self, f: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
         """
@@ -196,6 +209,7 @@ class DbSession:
         on pending session state.
         """
         backoff = self._retry_backoff
+        attempt = 0
 
         while True:
             try:
@@ -204,7 +218,17 @@ class DbSession:
                 logger.warning("Retrying operation due to PendingRollbackError: %s", e)
                 self.session.rollback()
             except OperationalError as e:
-                logger.warning("Retrying operation due to OperationalError: %s", e)
+                attempt += 1
+                gflog.emit(
+                    logger,
+                    Log.SYS_DB_CONNECTION_FAILED,
+                    "Database connection failed",
+                    fields={
+                        "error_type": type(e).__name__,
+                        "retry_attempt": attempt,
+                        "backoff_seconds": backoff[0] if backoff else 0,
+                    },
+                )
             except DatabaseError as e:
                 logger.warning("Retrying operation due to DatabaseError: %s", e)
                 raise
@@ -216,6 +240,5 @@ class DbSession:
                 logger.error("Operation failed after all retries")
                 raise DatabaseError("Operation failed after all retries", None, BaseException())
 
-            logger.info("Retrying operation in %s seconds", backoff[0])
             sleep(backoff[0] + random.uniform(0, 0.1))
             backoff = backoff[1:]

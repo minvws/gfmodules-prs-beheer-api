@@ -27,6 +27,7 @@ class TestCatalogue:
             ("HEALTH_UNHEALTHY", "270400"),
             ("SYS_APP_STARTED", "270401"),
             ("SYS_APP_STOPPED", "270402"),
+            ("SYS_DB_CONNECTION_FAILED", "270403"),
             ("SYS_APP_CRASHED", "270402"),
             ("SYS_UNHANDLED_EXCEPTION", "270404"),
             ("SYS_MISSING_CORRELATION_ID", "270428"),
