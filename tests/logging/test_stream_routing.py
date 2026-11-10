@@ -70,8 +70,8 @@ class TestClientRegistered:
         return route(
             Log.CLIENT_REGISTERED,
             "registered",
-            organisatie_oin=_ORGANISATIE_OIN,
-            handelende_oin=_HANDELENDE_OIN,
+            organization_identifier=_ORGANISATIE_OIN,
+            acting_organization_identifiers=_HANDELENDE_OIN,
             common_name="client.example.com",
             scopes="read",
         )
@@ -82,8 +82,8 @@ class TestClientRegistered:
 
     def test_both_streams_receive_the_oins_and_scopes(self, routed: Routed) -> None:
         for message in (routed[LoggingStreams.APP][0], routed[LoggingStreams.SIEM][0]):
-            assert message["organisatie_oin"] == _ORGANISATIE_OIN
-            assert message["handelende_oin"] == _HANDELENDE_OIN
+            assert message["organization_identifier"] == _ORGANISATIE_OIN
+            assert message["acting_organization_identifiers"] == _HANDELENDE_OIN
             assert message["scopes"] == "read"
 
 
