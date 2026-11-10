@@ -9,6 +9,7 @@ turns them into the same ``{"detail": ...}`` body FastAPI uses for
 
 import logging
 
+import gfmodules.logging as gflog
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -25,6 +26,7 @@ from app.exceptions import (
     ScopesNotFoundError,
     ScopesNotInOrganizationError,
 )
+from app.logging.events import Log
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,15 @@ STATUS_CODES: dict[type[DomainError], int] = {
 }
 
 
+REFUSED_REGISTRATION_DATA = (
+    CertificatesNotFoundError,
+    ScopesNotFoundError,
+    PersonalIdTypesNotFoundError,
+    ScopesNotInOrganizationError,
+    PersonalIdTypesNotInOrganizationError,
+)
+
+
 def status_code_for(exc: DomainError) -> int:
     for cls in type(exc).__mro__:
         if cls in STATUS_CODES:
@@ -53,6 +64,13 @@ def status_code_for(exc: DomainError) -> int:
 def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, DomainError)
     status_code = status_code_for(exc)
+    if isinstance(exc, REFUSED_REGISTRATION_DATA):
+        gflog.emit(
+            logger,
+            Log.ONBOARDING_VALIDATION_FAILED,
+            "validation failed for supplied registration data",
+            fields={"error_reason": exc.message},
+        )
     logger.warning(
         "%s %s refused with %d: %s",
         request.method,
