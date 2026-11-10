@@ -26,11 +26,11 @@ Every event carries these on every stream, whenever the request context holds a 
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `ORGANIZATION_REGISTERED` | 260400 | INFO | `organisatie_oin`, `bevoegdheden`, `initiated_by`, `approved_by` |
-| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | `organisatie_oin`, `deactivated_by`, `reason` |
+| `ORGANIZATION_REGISTERED` | 260400 | INFO | `organization_identifier`, `scopes`, `initiated_by`, `approved_by` |
+| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | `organization_identifier`, `deactivated_by`, `reason` |
 | `CLIENT_REGISTERED` | 260402 | INFO | `organisatie_oin`, `handelende_oin`, `common_name`, `scopes`, `approved_by` |
 | `CLIENT_WITHDRAWN` | 260403 | WARNING | `handelende_oin`, `organisatie_oin`, `deactivated_by`, `reason` |
-| `SCOPES_CHANGED` | 260404 | WARNING | `organisatie_oin`, `handelende_oin`, `changed_scopes`, `changed_by` |
+| `SCOPES_CHANGED` | 260404 | WARNING | `organization_identifier`, `acting_organization_identifiers`, `changed_scopes`, `changed_by` |
 | `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `error_reason` |
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
@@ -43,11 +43,11 @@ Every event carries these on every stream, whenever the request context holds a 
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `ORGANIZATION_REGISTERED` | 260400 | INFO | `organisatie_oin`, `approved_by` |
-| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | `organisatie_oin`, `deactivated_by` |
+| `ORGANIZATION_REGISTERED` | 260400 | INFO | `organization_identifier`, `approved_by` |
+| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | `organization_identifier`, `deactivated_by` |
 | `CLIENT_REGISTERED` | 260402 | INFO | `handelende_oin`, `organisatie_oin`, `scopes` |
 | `CLIENT_WITHDRAWN` | 260403 | WARNING | `handelende_oin`, `deactivated_by` |
-| `SCOPES_CHANGED` | 260404 | WARNING | `organisatie_oin`, `handelende_oin`, `changed_by` |
+| `SCOPES_CHANGED` | 260404 | WARNING | `organization_identifier`, `acting_organization_identifiers`, `changed_by` |
 | `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `error_reason` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason` |
