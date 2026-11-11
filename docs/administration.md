@@ -91,6 +91,7 @@ curl 'https://example.com/organizations/6054e0f0-7147-43db-816a-3a850c03b0ac/cli
   --key client.key \
   -H 'content-type: application/json' \
   --data-raw $'{
+  "name": "My Client",
   "scopes": [
     "prs:administration",
     "prs:pseudonym",

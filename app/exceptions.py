@@ -30,6 +30,12 @@ class ClientNotFoundError(DomainError):
     message = "Client not found"
 
 
+class ClientNameAlreadyExistsError(DomainError):
+    """Client names are unique within an organization, including deleted clients."""
+
+    message = "Client name already exists"
+
+
 class ClientAuthorizationNotFoundError(DomainError):
     """No active client matches the organization, certificate and client id of a resolve request."""
 

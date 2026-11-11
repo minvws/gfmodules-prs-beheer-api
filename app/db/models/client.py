@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import UUID, ForeignKey
+from sqlalchemy import UUID, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, Relationship, mapped_column, relationship
 
 from app.db.models.base import (
@@ -22,9 +22,14 @@ if TYPE_CHECKING:
 
 class ClientEntity(Base, WithUUID, WithTimestamps):
     __tablename__ = "clients"
-    __table_args__ = ({"schema": "admin"},)
+    __table_args__ = (
+        UniqueConstraint("organization_id", "name", name="uq_clients_organization_id_name"),
+        {"schema": "admin"},
+    )
 
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID, ForeignKey("admin.organizations.id"))
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     organization: Mapped[OrganizationEntity] = Relationship(back_populates="clients")
 
@@ -41,6 +46,7 @@ class ClientEntity(Base, WithUUID, WithTimestamps):
             **WithUUID.to_dict(self),
             **WithTimestamps.to_dict(self),
             "organization_id": self.organization_id,
+            "name": self.name,
             "certificates": [c.id for c in self.certificates],
             "scopes": [s.scope.name for s in self.scopes],
             "request_personal_id_types": [ra.personal_id_type.name for ra in self.request_personal_id_types],
