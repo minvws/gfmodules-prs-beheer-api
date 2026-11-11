@@ -42,18 +42,63 @@ def test_get_one_wrong_organization(
     assert client_repository.get_one(uuid4(), persisted_client_entity.id) is None
 
 
-def test_exists_found(
+def test_name_exists_found(
     client_repository: ClientRepository,
     persisted_client_entity: ClientEntity,
 ) -> None:
-    assert client_repository.exists(persisted_client_entity.organization_id, persisted_client_entity.id) is True
+    assert client_repository.name_exists(persisted_client_entity.organization_id, persisted_client_entity.name) is True
 
 
-def test_exists_not_found(
+def test_name_exists_not_found(
     client_repository: ClientRepository,
     persisted_client_entity: ClientEntity,
 ) -> None:
-    assert client_repository.exists(uuid4(), persisted_client_entity.id) is False
+    assert client_repository.name_exists(persisted_client_entity.organization_id, "Unknown Client") is False
+
+
+def test_name_exists_scoped_to_organization(
+    client_repository: ClientRepository,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    assert client_repository.name_exists(uuid4(), persisted_client_entity.name) is False
+
+
+def test_name_exists_ignores_excluded_client(
+    client_repository: ClientRepository,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    assert (
+        client_repository.name_exists(
+            persisted_client_entity.organization_id,
+            persisted_client_entity.name,
+            exclude_id=persisted_client_entity.id,
+        )
+        is False
+    )
+
+
+def test_name_exists_exclude_other_client_still_found(
+    client_repository: ClientRepository,
+    persisted_client_entity: ClientEntity,
+) -> None:
+    assert (
+        client_repository.name_exists(
+            persisted_client_entity.organization_id,
+            persisted_client_entity.name,
+            exclude_id=uuid4(),
+        )
+        is True
+    )
+
+
+def test_name_exists_includes_deleted_clients(
+    client_repository: ClientRepository,
+    persisted_client_entity: ClientEntity,
+    db_session: DbSession,
+) -> None:
+    persisted_client_entity.deleted_at = datetime.now(tz=timezone.utc)
+    db_session.commit()
+    assert client_repository.name_exists(persisted_client_entity.organization_id, persisted_client_entity.name) is True
 
 
 def test_get_many_excludes_deleted(

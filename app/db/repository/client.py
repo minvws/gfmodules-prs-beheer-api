@@ -19,10 +19,6 @@ class ClientRepository(RepositoryBase):
         stmt = select(ClientEntity).where(self._and_clause(organization_id, id))
         return self.db_session.session.execute(stmt).scalar_one_or_none()
 
-    def exists(self, organization_id: UUID, id: UUID) -> bool:
-        stmt = select(select(ClientEntity.id).where(self._and_clause(organization_id, id)).exists())
-        return bool(self.db_session.session.execute(stmt).scalar())
-
     def name_exists(self, organization_id: UUID, name: str, exclude_id: UUID | None = None) -> bool:
         condition = and_(ClientEntity.organization_id == organization_id, ClientEntity.name == name)
         if exclude_id is not None:
