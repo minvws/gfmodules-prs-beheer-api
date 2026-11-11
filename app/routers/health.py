@@ -1,11 +1,13 @@
 import logging
 from typing import Annotated
 
+import gfmodules.logging as gflog
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from app.container import get_database
 from app.db.db import Database
+from app.logging.events import Log
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -67,7 +69,17 @@ def health(db: Annotated[Database, Depends(get_database)]) -> JSONResponse:
     content = {"status": healthy, "components": components}
     if healthy == "ok":
         return JSONResponse(content=content)
-    logger.warning(f"Some components unhealthy: {components}")
+    unhealthy = [name for name, status in components.items() if status != "ok"]
+    gflog.emit(
+        logger,
+        Log.HEALTH_UNHEALTHY,
+        "Health check unhealthy",
+        fields={
+            "component": ",".join(unhealthy),
+            "status": "error",
+            "error_detail": f"unhealthy components: {', '.join(unhealthy)}",
+        },
+    )
     return JSONResponse(
         status_code=503,
         content=content,

@@ -3,6 +3,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from gfmodules.logging.testing import assert_event_emitted, capture_records
 from pydantic import SecretStr
 from sqlalchemy import select, text
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
@@ -10,6 +11,7 @@ from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from app.config import ConfigDatabase
 from app.db.db import Database
 from app.db.models.organization import OrganizationEntity
+from app.logging.events import Log
 from tests.conftest import TEST_EXTERNAL_ID, TEST_ORG_NAME
 
 
@@ -60,12 +62,30 @@ def test_commit_failure_leaves_nothing_persisted(retrying_database: Database) ->
         session.add(OrganizationEntity(external_id=TEST_EXTERNAL_ID, name=TEST_ORG_NAME))
 
         flaky = _failing(OperationalError("stmt", {}, Exception("connection refused")))
-        with patch.object(session.session, "commit", side_effect=flaky), pytest.raises(DatabaseError):
+        with (
+            capture_records("app") as records,
+            patch.object(session.session, "commit", side_effect=flaky),
+            pytest.raises(DatabaseError),
+        ):
             session.commit()
 
+    assert_event_emitted(records, Log.SYS_DB_CONNECTION_FAILED, error_type="OperationalError")
     with retrying_database.get_db_session() as session:
         rows: Sequence[Any] = session.execute(select(OrganizationEntity)).scalars().all()
         assert rows == []
+
+
+def test_every_connection_failure_on_a_read_is_logged_with_its_backoff(retrying_database: Database) -> None:
+    with retrying_database.get_db_session() as session, capture_records("app") as records:
+        failures = [OperationalError("stmt", {}, Exception("connection refused")) for _ in range(3)]
+        with patch.object(session.session, "execute", side_effect=_failing(*failures)), pytest.raises(DatabaseError):
+            session.execute(select(OrganizationEntity))
+
+    attempts = [
+        (entry.message["error_type"], entry.message["retry_attempt"], entry.message["backoff_seconds"])
+        for entry in records.for_event(Log.SYS_DB_CONNECTION_FAILED)
+    ]
+    assert attempts == [("OperationalError", 1, 0.01), ("OperationalError", 2, 0.01), ("OperationalError", 3, 0)]
 
 
 def test_reads_are_still_retried_after_a_rollback() -> None:
