@@ -103,7 +103,6 @@ def run() -> None:
 def application_init() -> None:
     setup_logging()
     gflog.install_excepthook(logger)
-    gflog.install_signal_handlers()
 
 
 def create_fastapi_app() -> FastAPI:
@@ -183,10 +182,6 @@ def setup_fastapi() -> FastAPI:
     if config.stats.enabled:
         fastapi.add_middleware(StatsdMiddleware, module_name=config.stats.module_name or "default")
 
-    fastapi.add_middleware(
-        RequestContextMiddleware,
-        correlation_id_expected=config.logging.correlation_id_expected,
-        trust_forwarded_for=config.logging.trust_forwarded_for,
-    )
+    fastapi.add_middleware(RequestContextMiddleware)
 
     return fastapi

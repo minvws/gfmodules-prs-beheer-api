@@ -1,6 +1,6 @@
 import pytest
 from gfmodules.logging import DefaultEventCatalogue, LoggingStreams, declared_events
-from gfmodules.logging.testing import assert_catalogue_complete
+from gfmodules.logging.testing import assert_catalogue_complete, assert_event_overview_current
 
 from app.logging.events import Log
 
@@ -11,6 +11,9 @@ _SIEM = LoggingStreams.SIEM
 class TestCatalogue:
     def test_defines_every_required_event(self) -> None:
         assert_catalogue_complete(Log)
+
+    def test_the_event_overview_is_current(self) -> None:
+        assert_event_overview_current(Log, "docs/log-events.md")
 
     @pytest.mark.parametrize(
         "name,event_id",

@@ -82,6 +82,7 @@ class ConfigStats(BaseModel):
 
 class ConfigLogging(GFConfigLogging):
     _split_console_streams = field_validator("console_streams", mode="before")(split_comma_separated())
+    _split_syslog_streams = field_validator("syslog_streams", mode="before")(split_comma_separated())
 
 
 class Config(BaseModel):
