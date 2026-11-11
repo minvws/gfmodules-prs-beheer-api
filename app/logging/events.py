@@ -40,8 +40,14 @@ class Log(_Base):
         logging.INFO,
         (_APP, _SIEM),
         {
-            _APP: ("organisatie_oin", "handelende_oin", "common_name", "scopes", "approved_by"),
-            _SIEM: ("handelende_oin", "organisatie_oin", "scopes"),
+            _APP: (
+                "organization_identifier",
+                "acting_organization_identifiers",
+                "common_name",
+                "scopes",
+                "approved_by",
+            ),
+            _SIEM: ("acting_organization_identifiers", "organization_identifier", "scopes"),
         },
     )
     CLIENT_WITHDRAWN = LogEvent(  # PRS-OB-004
@@ -49,8 +55,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("handelende_oin", "organisatie_oin", "deactivated_by", "reason"),
-            _SIEM: ("handelende_oin", "deactivated_by"),
+            _APP: ("acting_organization_identifiers", "organization_identifier", "deactivated_by", "reason"),
+            _SIEM: ("acting_organization_identifiers", "deactivated_by"),
         },
     )
     SCOPES_CHANGED = LogEvent(  # PRS-OB-005
