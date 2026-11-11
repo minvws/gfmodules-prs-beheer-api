@@ -2,28 +2,29 @@ import logging
 from collections.abc import Mapping
 from typing import ClassVar
 
-from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
+from gfmodules.logging import ContextField, DefaultEventCatalogue, LogEvent, LoggingStreams
+from gfmodules.logging.context import sanitize_free_text
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
 
 _Base = DefaultEventCatalogue
 
+ACTOR = ContextField(name="actor_cn", header="x-gf-act-cn", sanitizer=sanitize_free_text)
+ORGANIZATION = ContextField(name="organization_id", header=None)
+_REQUESTER = (ACTOR.name, ORGANIZATION.name)
+
 
 class Log(_Base):
-    # Onboarding en Beheer (PRS-OB) audit events for the beheer API.
-    # See https://github.com/minvws/gfmodules-coordination-private/issues/1040
-    # The ``fields`` map mirrors the "Stroom 2" (APP) / "Stroom 3" (SIEM) columns.
-    # The initiated_by/approved_by/deactivated_by/changed_by fields are part of
-    # the spec (four-eyes workflow) but the API carries no administrator
-    # identity yet; they are routed when supplied.
+    context_fields = (ACTOR, ORGANIZATION)
+
     ORGANIZATION_REGISTERED = LogEvent(  # PRS-OB-001
         "260400",
         logging.INFO,
         (_APP, _SIEM),
         {
-            _APP: ("organization_identifier", "scopes", "initiated_by", "approved_by"),
-            _SIEM: ("organization_identifier", "approved_by"),
+            _APP: (*_REQUESTER, "organization_identifier", "scopes"),
+            _SIEM: (*_REQUESTER, "organization_identifier"),
         },
     )
     ORGANIZATION_WITHDRAWN = LogEvent(  # PRS-OB-002
@@ -31,8 +32,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("organization_identifier", "deactivated_by", "reason"),
-            _SIEM: ("organization_identifier", "deactivated_by"),
+            _APP: (*_REQUESTER, "organization_identifier"),
+            _SIEM: (*_REQUESTER, "organization_identifier"),
         },
     )
     CLIENT_REGISTERED = LogEvent(  # PRS-OB-003
@@ -41,13 +42,13 @@ class Log(_Base):
         (_APP, _SIEM),
         {
             _APP: (
+                *_REQUESTER,
                 "organization_identifier",
                 "acting_organization_identifiers",
                 "common_name",
                 "scopes",
-                "approved_by",
             ),
-            _SIEM: ("acting_organization_identifiers", "organization_identifier", "scopes"),
+            _SIEM: (*_REQUESTER, "acting_organization_identifiers", "organization_identifier", "scopes"),
         },
     )
     CLIENT_WITHDRAWN = LogEvent(  # PRS-OB-004
@@ -55,8 +56,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("acting_organization_identifiers", "organization_identifier", "deactivated_by", "reason"),
-            _SIEM: ("acting_organization_identifiers", "deactivated_by"),
+            _APP: (*_REQUESTER, "acting_organization_identifiers", "organization_identifier"),
+            _SIEM: (*_REQUESTER, "acting_organization_identifiers"),
         },
     )
     SCOPES_CHANGED = LogEvent(  # PRS-OB-005
@@ -64,8 +65,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("organization_identifier", "acting_organization_identifiers", "changed_scopes", "changed_by"),
-            _SIEM: ("organization_identifier", "acting_organization_identifiers", "changed_by"),
+            _APP: (*_REQUESTER, "organization_identifier", "acting_organization_identifiers", "changed_scopes"),
+            _SIEM: (*_REQUESTER, "organization_identifier", "acting_organization_identifiers"),
         },
     )
     ONBOARDING_VALIDATION_FAILED = LogEvent(  # PRS-OB-006
@@ -73,8 +74,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("error_reason",),
-            _SIEM: ("error_reason",),
+            _APP: (*_REQUESTER, "error_reason"),
+            _SIEM: (*_REQUESTER, "error_reason"),
         },
     )
     HEALTH_UNHEALTHY = LogEvent(  # PRS-HEALTH-001
@@ -92,8 +93,11 @@ class Log(_Base):
         (_APP, _SIEM),
         {_APP: ("error_type", "retry_attempt", "backoff_seconds"), _SIEM: ("error_type",)},
     )
-    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404")  # PRS-SYS-004
+    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404").add_fields(  # PRS-SYS-004
+        {_APP: _REQUESTER, _SIEM: _REQUESTER}
+    )
     SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("270428")
+    ACCESS_REQUEST = _Base.ACCESS_REQUEST.add_fields({_APP: _REQUESTER})
 
     access_event_id: ClassVar[Mapping[tuple[str, str], str]] = {
         ("POST", "/organizations"): "260700",

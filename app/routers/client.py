@@ -6,10 +6,13 @@ from fastapi import APIRouter, Body, Depends, Query
 
 from app.container import get_client_service
 from app.models.client import Client, ClientCreate, ClientQueryParams, ClientUpdate
+from app.routers.context import organization_in_context
 from app.services.client import ClientService
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/organizations/{organization_id}/clients", tags=["Clients"])
+router = APIRouter(
+    prefix="/organizations/{organization_id}/clients", dependencies=[Depends(organization_in_context)], tags=["Clients"]
+)
 
 
 @router.post(

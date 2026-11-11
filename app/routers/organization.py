@@ -6,6 +6,7 @@ from fastapi import APIRouter, Body, Depends, Query
 
 from app.container import get_organization_service
 from app.models.organization import Organization, OrganizationCreate, OrganizationQueryParams, OrganizationUpdate
+from app.routers.context import organization_id_in_context
 from app.services.organization import OrganizationService
 
 logger = logging.getLogger(__name__)
@@ -20,7 +21,12 @@ def register(
     return service.create_one(data)
 
 
-@router.get("/{id}", response_model=Organization, response_model_exclude_none=True)
+@router.get(
+    "/{id}",
+    response_model=Organization,
+    response_model_exclude_none=True,
+    dependencies=[Depends(organization_id_in_context)],
+)
 def get_by_id(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],
@@ -37,7 +43,12 @@ def get_many(
     return service.get_many(**params.model_dump())
 
 
-@router.put("/{id}", response_model=Organization, response_model_exclude_none=True)
+@router.put(
+    "/{id}",
+    response_model=Organization,
+    response_model_exclude_none=True,
+    dependencies=[Depends(organization_id_in_context)],
+)
 def update(
     id: UUID,
     body: OrganizationUpdate,
@@ -46,7 +57,7 @@ def update(
     return service.update_one(id, body)
 
 
-@router.delete("/{id}", response_model=Organization)
+@router.delete("/{id}", response_model=Organization, dependencies=[Depends(organization_id_in_context)])
 def delete(
     id: UUID,
     service: Annotated[OrganizationService, Depends(get_organization_service)],

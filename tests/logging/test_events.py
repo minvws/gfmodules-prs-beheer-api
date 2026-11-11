@@ -2,10 +2,11 @@ import pytest
 from gfmodules.logging import DefaultEventCatalogue, LoggingStreams, declared_events
 from gfmodules.logging.testing import assert_catalogue_complete, assert_event_overview_current
 
-from app.logging.events import Log
+from app.logging.events import ACTOR, ORGANIZATION, Log
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
+_GIVEN_THE_ACTOR = ("ACCESS_REQUEST", "SYS_UNHANDLED_EXCEPTION")
 
 
 class TestCatalogue:
@@ -40,6 +41,13 @@ class TestCatalogue:
         for name, event in declared_events(Log):
             assert event.streams, f"{name} declares no stream"
 
+    def test_every_request_event_carries_who_made_the_request(self) -> None:
+        for name, event in declared_events(Log):
+            if name.startswith(("SYS_", "HEALTH_")) and name != "SYS_UNHANDLED_EXCEPTION":
+                continue
+            for stream in event.streams:
+                assert ACTOR.name in event.fields[stream], f"{name} drops the actor on {stream}"
+
     def test_every_allow_list_names_a_stream_the_event_routes(self) -> None:
         for name, event in declared_events(Log):
             unrouted = set(event.fields) - set(event.streams)
@@ -66,4 +74,13 @@ class TestTheOverriddenSlots:
             and isinstance(getattr(DefaultEventCatalogue, name, None), type(Log.SYS_APP_STARTED))
             and event.replace(event_id="") != getattr(DefaultEventCatalogue, name).replace(event_id="")
         }
-        assert rerouted == set()
+        assert rerouted == set(_GIVEN_THE_ACTOR)
+
+    @pytest.mark.parametrize("name", _GIVEN_THE_ACTOR)
+    def test_a_rerouted_slot_only_adds_who_made_the_request_and_for_which_organization(self, name: str) -> None:
+        shared = getattr(DefaultEventCatalogue, name)
+        event = getattr(Log, name)
+        assert event.streams == shared.streams
+        assert event.fields == {
+            stream: (*shared.fields[stream], ACTOR.name, ORGANIZATION.name) for stream in shared.streams
+        }
