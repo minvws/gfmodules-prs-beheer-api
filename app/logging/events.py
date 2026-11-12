@@ -22,8 +22,8 @@ class Log(_Base):
         logging.INFO,
         (_APP, _SIEM),
         {
-            _APP: ("organisatie_oin", "bevoegdheden", "initiated_by", "approved_by"),
-            _SIEM: ("organisatie_oin", "approved_by"),
+            _APP: ("organization_identifier", "scopes", "initiated_by", "approved_by"),
+            _SIEM: ("organization_identifier", "approved_by"),
         },
     )
     ORGANIZATION_WITHDRAWN = LogEvent(  # PRS-OB-002
@@ -31,8 +31,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("organisatie_oin", "deactivated_by", "reason"),
-            _SIEM: ("organisatie_oin", "deactivated_by"),
+            _APP: ("organization_identifier", "deactivated_by", "reason"),
+            _SIEM: ("organization_identifier", "deactivated_by"),
         },
     )
     CLIENT_REGISTERED = LogEvent(  # PRS-OB-003
@@ -58,8 +58,8 @@ class Log(_Base):
         logging.WARNING,
         (_APP, _SIEM),
         {
-            _APP: ("organisatie_oin", "handelende_oin", "changed_scopes", "changed_by"),
-            _SIEM: ("organisatie_oin", "handelende_oin", "changed_by"),
+            _APP: ("organization_identifier", "acting_organization_identifiers", "changed_scopes", "changed_by"),
+            _SIEM: ("organization_identifier", "acting_organization_identifiers", "changed_by"),
         },
     )
     ONBOARDING_VALIDATION_FAILED = LogEvent(  # PRS-OB-006
