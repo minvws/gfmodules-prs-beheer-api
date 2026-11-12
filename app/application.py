@@ -35,26 +35,18 @@ logger = logging.getLogger(__name__)
 
 
 def _error_reason(exc: RequestValidationError) -> str:
-    return "; ".join(f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}" for error in exc.errors())
+    return "; ".join(f"{'.'.join(str(part) for part in error['loc'])}: {error['type']}" for error in exc.errors())
 
 
 def request_validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
-    # Log only where and why validation failed; the rejected input values may contain request body data
-    error_reason = _error_reason(exc)
-    logger.warning(
-        "Request validation failed method=%s path=%s errors=%s",
-        request.method,
-        request.url.path,
-        error_reason,
-    )
     gflog.emit(
         logger,
         Log.ONBOARDING_VALIDATION_FAILED,
         "validation failed for supplied registration data",
-        fields={"error_reason": error_reason},
+        fields={"error_reason": _error_reason(exc)},
     )
     return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
