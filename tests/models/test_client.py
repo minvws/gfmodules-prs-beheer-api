@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
 import pytest
@@ -63,8 +63,8 @@ def test_response_model_from_entity() -> None:
         request_personal_id_types=[
             ClientPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
         ],
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         deleted_at=None,
     )
     model = Client.model_validate(entity.to_dict())
@@ -80,9 +80,9 @@ def test_response_model_from_entity_deleted() -> None:
         request_personal_id_types=[
             ClientPersonalIdTypeEntity(personal_id_type=PersonalIdTypeEntity(name=PersonalIdType.OPRF))
         ],
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
-        deleted_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        deleted_at=datetime.now(UTC),
     )
     model = Client.model_validate(entity.to_dict())
     assert model.id == entity.id
@@ -177,7 +177,7 @@ def test_response_model_includes_name() -> None:
         name="Named Client",
         id=uuid4(),
         organization_id=uuid4(),
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
     assert Client.model_validate(entity.to_dict()).name == "Named Client"

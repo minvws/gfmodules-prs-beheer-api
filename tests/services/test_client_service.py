@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -454,7 +454,7 @@ def test_resolve_should_reject_client_of_deleted_organization(
     )
     _link_certificates(client_service, persisted_client_entity, [certificate.id])
     # Deleting an organization with active clients is refused by the service, but may exist from before that check
-    persisted_client_entity.organization.deleted_at = datetime.now(tz=timezone.utc)
+    persisted_client_entity.organization.deleted_at = datetime.now(tz=UTC)
     db_session.commit()
 
     request = ResolveRequest(

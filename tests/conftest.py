@@ -1,5 +1,5 @@
 from collections.abc import Generator
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
@@ -48,7 +48,7 @@ TEST_EXTERNAL_ID = Oin("00000099000000009000")
 TEST_ORG_NAME = "Test Organization"
 TEST_COMMON_NAME = "Test Client"
 VALID_OIN = TEST_OIN
-FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+FIXED_CREATED_AT = datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC)
 DEFAULT_AUTHORIZATION_SCOPES = [AuthorizationScope.ADMINISTRATION]
 DEFAULT_RECEIVE_PERSONAL_ID_TYPES = [PersonalIdType.OPRF]
 DEFAULT_REQUEST_PERSONAL_ID_TYPES = [PersonalIdType.REVERSIBLE_PSEUDONYM]

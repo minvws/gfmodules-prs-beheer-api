@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.db.db import Database
@@ -92,7 +92,7 @@ class OrganizationService:
                 raise OrganizationNotFoundError()
             if not organization_entity.deleted_at and organization_update.deleted:
                 self._assert_no_active_clients(organization_entity)
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             organization_entity.external_id = organization_update.external_id
             organization_entity.name = organization_update.name
             organization_entity.updated_at = now
@@ -129,7 +129,7 @@ class OrganizationService:
             if entity.deleted_at is not None:
                 return Organization(**entity.to_dict())
             self._assert_no_active_clients(entity)
-            entity.updated_at = entity.deleted_at = datetime.now(tz=timezone.utc)
+            entity.updated_at = entity.deleted_at = datetime.now(tz=UTC)
             ret_value = Organization(**entity.to_dict())
             session.commit()
             return ret_value

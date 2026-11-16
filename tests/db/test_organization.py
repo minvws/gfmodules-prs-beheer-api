@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.db.models.organization import OrganizationEntity
@@ -66,7 +66,7 @@ def test_get_many_excludes_deleted(
     persisted_organization: OrganizationEntity,
     db_session: DbSession,
 ) -> None:
-    persisted_organization.deleted_at = datetime.now(timezone.utc)
+    persisted_organization.deleted_at = datetime.now(UTC)
     assert organization_repository.get_many() == []
 
 
@@ -75,7 +75,7 @@ def test_get_many_include_deleted_returns_deleted(
     persisted_organization: OrganizationEntity,
     db_session: DbSession,
 ) -> None:
-    persisted_organization.deleted_at = datetime.now(timezone.utc)
+    persisted_organization.deleted_at = datetime.now(UTC)
     db_session.commit()
     results = organization_repository.get_many(include_deleted=True)
     assert len(results) == 1
