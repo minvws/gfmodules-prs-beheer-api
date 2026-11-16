@@ -73,3 +73,6 @@ updates:
     groups:
       compose-patch-minor:
         update-types: [patch, minor] # Major versions not grouped, one PR per breaking change
+    ignore:
+      - dependency-name: postgres
+        versions: [">=18"] # Capped at Postgres 17
