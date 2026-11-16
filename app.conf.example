@@ -5,23 +5,22 @@ loglevel=debug
 scopes = read write delete admin
 
 [logging]
-# All keys are optional. When syslog_path is omitted, logs only go to stdout.
-# Single syslog channel in host:port format (UDP). All streams (app, siem,
-# public_inspect, debug) are sent here; each JSON record carries a stream_id
-# field so the log server can tell them apart.
+# Syslog server as host:port (UDP), empty logs to stdout only
 syslog_path=
-# Identifies this application in the JSON records (application_id field),
-# so the log server can tell apart applications sharing the channel.
+# Streams sent to syslog: app, siem, public_inspect, debug
+syslog_streams=app,siem,public_inspect
+# Name of this application in every log record
 application_id=prs-beheer-api
-# Emit an access record per request.
-access_logs=True
-# Include stack traces in the JSON logs
-include_traces=True
-# Which streams reach stdout as readable text, comma separated, from
-# app, siem and debug. Empty leaves stdout silent.
+# Streams printed to stdout: app, siem, debug
 console_streams=debug
-# Log an error when a request arrives without an X-GF-Correlation-ID header
+# Include tracebacks in logs
+include_traces=True
+# Log every request
+access_logs=True
+# Log an error when X-GF-Correlation-ID is missing
 correlation_id_expected=False
+# Take the client ip from X-Forwarded-For, only enable behind a trusted proxy
+trust_forwarded_for=False
 
 [database]
 # Dsn for database connection
