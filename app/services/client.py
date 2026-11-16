@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from app.db.db import Database
@@ -148,7 +148,7 @@ class ClientService:
             if repo.name_exists(organization_id, update.name, exclude_id=client_entity.id):
                 logger.debug("Client name already in use by another client")
                 raise ClientNameAlreadyExistsError()
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             client_entity.updated_at = now
             client_entity.name = update.name
             client_entity.certificates = certificates
@@ -181,7 +181,7 @@ class ClientService:
                 raise ClientNotFoundError()
             if client_entity.deleted_at is not None:
                 return Client(**client_entity.to_dict())
-            client_entity.deleted_at = client_entity.updated_at = datetime.now(tz=timezone.utc)
+            client_entity.deleted_at = client_entity.updated_at = datetime.now(tz=UTC)
             session.commit()
             return Client(**client_entity.to_dict())
 

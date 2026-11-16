@@ -3,13 +3,12 @@ import random
 from collections.abc import Callable
 from time import sleep
 from types import TracebackType
-from typing import Any, ParamSpec, TypeVar
+from typing import Any, ParamSpec, Self, TypeVar
 
 from sqlalchemy import Delete, Engine, Insert, Result
 from sqlalchemy.exc import DatabaseError, OperationalError, PendingRollbackError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.selectable import TypedReturnsRows
-from typing_extensions import Self
 
 from app.db.models.base import Base
 from app.db.repository import base

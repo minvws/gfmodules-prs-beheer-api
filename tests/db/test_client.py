@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.db.models.client import ClientEntity
@@ -96,7 +96,7 @@ def test_name_exists_includes_deleted_clients(
     persisted_client_entity: ClientEntity,
     db_session: DbSession,
 ) -> None:
-    persisted_client_entity.deleted_at = datetime.now(tz=timezone.utc)
+    persisted_client_entity.deleted_at = datetime.now(tz=UTC)
     db_session.commit()
     assert client_repository.name_exists(persisted_client_entity.organization_id, persisted_client_entity.name) is True
 
@@ -106,7 +106,7 @@ def test_get_many_excludes_deleted(
     persisted_client_entity: ClientEntity,
     db_session: DbSession,
 ) -> None:
-    persisted_client_entity.deleted_at = datetime.now(tz=timezone.utc)
+    persisted_client_entity.deleted_at = datetime.now(tz=UTC)
     db_session.commit()
     assert client_repository.get_many(organization_id=persisted_client_entity.organization_id) == []
 
@@ -116,7 +116,7 @@ def test_get_many_include_deleted_returns_deleted(
     persisted_client_entity: ClientEntity,
     db_session: DbSession,
 ) -> None:
-    persisted_client_entity.deleted_at = datetime.now(tz=timezone.utc)
+    persisted_client_entity.deleted_at = datetime.now(tz=UTC)
     db_session.commit()
     results = client_repository.get_many(organization_id=persisted_client_entity.organization_id, include_deleted=True)
     assert len(results) == 1

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -116,8 +116,8 @@ def test_response_model_from_entity() -> None:
         name=TEST_ORG_NAME,
         receive_personal_id_types=[PersonalIdTypeEntity(name=PersonalIdType.OPRF)],
         request_personal_id_types=[PersonalIdTypeEntity(name=PersonalIdType.OPRF)],
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         deleted_at=None,
     )
     model = Organization.model_validate(entity.to_dict())
