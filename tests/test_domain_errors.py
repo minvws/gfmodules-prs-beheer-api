@@ -3,11 +3,13 @@
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from gfmodules.logging.testing import capture_records
 from pytest_mock import MockerFixture
 
 from app import application, exceptions
 from app.config import set_config
 from app.exceptions import DomainError, ScopesNotInOrganizationError
+from app.logging.events import Log
 from app.routers.errors import STATUS_CODES, domain_error_handler, install_domain_error_handler, status_code_for
 from tests.test_config import get_test_config
 
@@ -75,6 +77,19 @@ def test_handler_includes_the_arguments_in_the_message(client: TestClient) -> No
 
     assert response.status_code == 404
     assert response.json() == {"detail": "The following scopes do not exist in the organization: prs:read, prs:write"}
+
+
+def test_only_refused_registration_data_is_logged_as_an_onboarding_failure(client: TestClient) -> None:
+    with capture_records("app.routers.errors") as captured:
+        client.get("/refuse")
+        client.get("/with-arguments")
+
+    reasons = [
+        entry.record.error_reason  # type: ignore[attr-defined]
+        for entry in captured.entries
+        if getattr(entry.record, "event_id", None) == Log.ONBOARDING_VALIDATION_FAILED.event_id
+    ]
+    assert reasons == ["The following scopes do not exist in the organization: prs:read, prs:write"]
 
 
 def test_handler_uses_the_message_given_at_raise_time(client: TestClient) -> None:
