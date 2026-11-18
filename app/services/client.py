@@ -21,6 +21,7 @@ from app.exceptions import (
     PersonalIdTypesNotInOrganizationError,
     ScopesNotInOrganizationError,
 )
+from app.logging.context import client_in_context, organization_in_context
 from app.models.client import (
     Client,
     ClientCreate,
@@ -60,6 +61,11 @@ class ClientService:
             raise CertificatesNotFoundError()
         return certificates
 
+    @staticmethod
+    def _in_context(entity: ClientEntity) -> None:
+        organization_in_context(entity.organization.external_id, entity.organization.name)
+        client_in_context(entity.name, entity.certificates)
+
     def create_one(
         self,
         organization_id: UUID,
@@ -67,6 +73,7 @@ class ClientService:
     ) -> Client:
         with self.db.get_db_session() as session:
             organization = self._get_organization(session, organization_id)
+            organization_in_context(organization.external_id, organization.name)
 
             scopes_by_name = {item.name: item for item in organization.scopes}
             request_by_pid = {item.name: item for item in organization.request_personal_id_types}
@@ -79,6 +86,7 @@ class ClientService:
             if not_in_organization:
                 raise PersonalIdTypesNotInOrganizationError(not_in_organization)
             certificates = self._get_certificates(session, organization_id, input.certificates)
+            client_in_context(input.name, certificates)
 
             repo = session.get_repository(ClientRepository)
             if repo.name_exists(organization_id, input.name):
@@ -113,6 +121,7 @@ class ClientService:
             entity = repo.get_one(organization_id, id)
             if not entity:
                 raise ClientNotFoundError()
+            self._in_context(entity)
             return Client(**entity.to_dict())
 
     def get_many(self, organization_id: UUID, client_query_params: ClientQueryParams) -> list[Client]:
@@ -128,6 +137,7 @@ class ClientService:
     def update_one(self, id: UUID, organization_id: UUID, update: ClientUpdate) -> Client:
         with self.db.get_db_session(commit=True) as session:
             organization = self._get_organization(session, organization_id)
+            organization_in_context(organization.external_id, organization.name)
             scopes_by_name = {item.name: item for item in organization.scopes}
             organization_pids = [pide.name for pide in organization.request_personal_id_types]
 
@@ -145,6 +155,7 @@ class ClientService:
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
                 raise ClientNotFoundError()
+            client_in_context(update.name, certificates)
             if repo.name_exists(organization_id, update.name, exclude_id=client_entity.id):
                 logger.debug("Client name already in use by another client")
                 raise ClientNameAlreadyExistsError()
@@ -179,6 +190,7 @@ class ClientService:
             if not client_entity:
                 logger.debug("Client not found for update organization_id%s, id=%s", organization_id, id)
                 raise ClientNotFoundError()
+            self._in_context(client_entity)
             if client_entity.deleted_at is not None:
                 return Client(**client_entity.to_dict())
             client_entity.deleted_at = client_entity.updated_at = datetime.now(tz=UTC)
