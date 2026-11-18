@@ -14,6 +14,7 @@ from app.exceptions import (
     PersonalIdTypesNotFoundError,
     ScopesNotFoundError,
 )
+from app.logging import audit
 from app.logging.context import organization_in_context
 from app.models.oin import Oin
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
@@ -61,7 +62,9 @@ class OrganizationService:
             )
             session.flush()
             organization_in_context(entity.external_id, entity.name)
-            return Organization(**entity.to_dict())
+            organization = Organization(**entity.to_dict())
+        audit.organization_registered(organization)
+        return organization
 
     def get_one(self, id: UUID) -> Organization:
         with self.db.get_db_session() as session:
@@ -93,6 +96,7 @@ class OrganizationService:
             if not organization_entity:
                 logger.debug("Organization not found for update id=%s", id)
                 raise OrganizationNotFoundError()
+            before = Organization(**organization_entity.to_dict())
             organization_in_context(organization_entity.external_id, organization_entity.name)
             if not organization_entity.deleted_at and organization_update.deleted:
                 self._assert_no_active_clients(organization_entity)
@@ -122,7 +126,9 @@ class OrganizationService:
             organization_entity.request_personal_id_types = list(request_personal_id_types)
 
             organization_in_context(organization_entity.external_id, organization_entity.name)
-            return Organization(**organization_entity.to_dict())
+            after = Organization(**organization_entity.to_dict())
+        audit.organization_updated(before, after)
+        return after
 
     def delete_one(self, id: UUID) -> Organization:
         with self.db.get_db_session() as session:
@@ -138,7 +144,8 @@ class OrganizationService:
             entity.updated_at = entity.deleted_at = datetime.now(tz=UTC)
             ret_value = Organization(**entity.to_dict())
             session.commit()
-            return ret_value
+        audit.organization_withdrawn()
+        return ret_value
 
     @staticmethod
     def _assert_no_active_clients(entity: OrganizationEntity) -> None:
