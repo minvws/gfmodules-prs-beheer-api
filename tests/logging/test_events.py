@@ -2,6 +2,7 @@ import pytest
 from gfmodules.logging import DefaultEventCatalogue, LoggingStreams, declared_events
 from gfmodules.logging.testing import assert_catalogue_complete, assert_event_overview_current
 
+from app.logging.context import NAMES
 from app.logging.events import Log
 
 _APP = LoggingStreams.APP
@@ -64,4 +65,7 @@ class TestTheOverriddenSlots:
             and isinstance(getattr(DefaultEventCatalogue, name, None), type(Log.SYS_APP_STARTED))
             and event.replace(event_id="") != getattr(DefaultEventCatalogue, name).replace(event_id="")
         }
-        assert rerouted == set()
+        assert rerouted == {"ACCESS_REQUEST", "SYS_UNHANDLED_EXCEPTION"}
+        for name in rerouted:
+            shared = getattr(DefaultEventCatalogue, name)
+            assert getattr(Log, name).fields == {**shared.fields, _APP: (*shared.fields[_APP], *NAMES)}

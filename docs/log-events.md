@@ -21,6 +21,14 @@ Every event carries these on every stream, whenever the request context holds a 
 - `endpoint`
 - `method`
 - `scope`
+- `actor_cn`
+- `represented_organization_identifier`
+- `acting_organization_identifiers`
+
+The request context also holds these, but an event carries them only on the streams whose fields name them.
+
+- `represented_organization_name`
+- `client_name`
 
 ## Stream `app`
 
@@ -35,9 +43,9 @@ Every event carries these on every stream, whenever the request context holds a 
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason`, `last_exception_type` |
-| `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
+| `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method`, `represented_organization_name`, `client_name` |
 | `SYS_MISSING_CORRELATION_ID` | 270428 | ERROR | `endpoint`, `method` |
-| `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated` |
+| `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated`, `represented_organization_name`, `client_name` |
 
 ## Stream `siem`
 

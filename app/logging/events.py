@@ -2,7 +2,9 @@ import logging
 from collections.abc import Mapping
 from typing import ClassVar
 
-from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
+from gfmodules.logging import ContextField, DefaultEventCatalogue, LogEvent, LoggingStreams
+
+from app.logging.context import CONTEXT_FIELDS, NAMES
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
@@ -74,9 +76,12 @@ class Log(_Base):
     SYS_APP_STARTED = _Base.SYS_APP_STARTED.with_id("270401")  # PRS-SYS-001
     SYS_APP_STOPPED = _Base.SYS_APP_STOPPED.with_id("270402")  # PRS-SYS-002
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("270402")  # PRS-SYS-002
-    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404")  # PRS-SYS-004
+    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404").add_fields({_APP: NAMES})  # PRS-SYS-004
     SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("270428")
 
+    ACCESS_REQUEST = _Base.ACCESS_REQUEST.add_fields({_APP: NAMES})
+
+    context_fields: ClassVar[tuple[ContextField, ...]] = CONTEXT_FIELDS
     access_event_id: ClassVar[Mapping[tuple[str, str], str]] = {
         ("POST", "/organizations"): "260700",
         ("PUT", "/organizations/{id}"): "260701",
