@@ -1,6 +1,4 @@
 import logging
-from collections.abc import Mapping
-from typing import ClassVar
 
 from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
 
@@ -76,12 +74,3 @@ class Log(_Base):
     SYS_APP_CRASHED = _Base.SYS_APP_CRASHED.with_id("270402")  # PRS-SYS-002
     SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404")  # PRS-SYS-004
     SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("270428")
-
-    access_event_id: ClassVar[Mapping[tuple[str, str], str]] = {
-        ("POST", "/organizations"): "260700",
-        ("PUT", "/organizations/{id}"): "260701",
-        ("DELETE", "/organizations/{id}"): "260702",
-        ("POST", "/organizations/{organization_id}/clients"): "260703",
-        ("PUT", "/organizations/{organization_id}/clients/{id}"): "260704",
-        ("DELETE", "/organizations/{organization_id}/clients/{id}"): "260705",
-    }

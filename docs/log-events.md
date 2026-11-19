@@ -52,16 +52,3 @@ Every event carries these on every stream, whenever the request context holds a 
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
-
-## Access event ids per route
-
-`ACCESS_REQUEST` carries these ids instead of its own on these routes.
-
-| Method | Route | Id |
-| --- | --- | --- |
-| POST | `/organizations` | 260700 |
-| PUT | `/organizations/{id}` | 260701 |
-| DELETE | `/organizations/{id}` | 260702 |
-| POST | `/organizations/{organization_id}/clients` | 260703 |
-| PUT | `/organizations/{organization_id}/clients/{id}` | 260704 |
-| DELETE | `/organizations/{organization_id}/clients/{id}` | 260705 |

@@ -48,12 +48,6 @@ class TestCatalogue:
             assert LoggingStreams.PUBLIC_INSPECT not in event.streams, f"{name} routes to public_inspect"
 
 
-class TestPerRouteAccessIds:
-    def test_the_beheer_routes_carry_their_own_access_event_id(self) -> None:
-        assert Log.access_event_id[("POST", "/organizations")] == "260700"
-        assert Log.access_event_id[("DELETE", "/organizations/{organization_id}/clients/{id}")] == "260705"
-
-
 class TestTheOverriddenSlots:
     def test_every_other_system_slot_keeps_the_shared_routing(self) -> None:
         rerouted = {
