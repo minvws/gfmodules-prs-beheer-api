@@ -34,12 +34,12 @@ The request context also holds these, but an event carries them only on the stre
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `ORGANIZATION_REGISTERED` | 260400 | INFO | `organisatie_oin`, `bevoegdheden`, `initiated_by`, `approved_by` |
-| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | `organisatie_oin`, `deactivated_by`, `reason` |
-| `CLIENT_REGISTERED` | 260402 | INFO | `organisatie_oin`, `handelende_oin`, `common_name`, `scopes`, `approved_by` |
-| `CLIENT_WITHDRAWN` | 260403 | WARNING | `handelende_oin`, `organisatie_oin`, `deactivated_by`, `reason` |
-| `SCOPES_CHANGED` | 260404 | WARNING | `organisatie_oin`, `handelende_oin`, `changed_scopes`, `changed_by` |
-| `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `error_reason` |
+| `ORGANIZATION_REGISTERED` | 260400 | INFO | `represented_organization_name`, `client_name`, `scopes` |
+| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | `represented_organization_name`, `client_name` |
+| `CLIENT_REGISTERED` | 260402 | INFO | `represented_organization_name`, `client_name`, `common_name`, `scopes` |
+| `CLIENT_WITHDRAWN` | 260403 | WARNING | `represented_organization_name`, `client_name` |
+| `SCOPES_CHANGED` | 260404 | WARNING | `represented_organization_name`, `client_name`, `changed_scopes` |
+| `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `represented_organization_name`, `client_name`, `error_reason` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status`, `error_detail` |
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
@@ -53,11 +53,11 @@ The request context also holds these, but an event carries them only on the stre
 
 | Event | Id | Level | Fields |
 | --- | --- | --- | --- |
-| `ORGANIZATION_REGISTERED` | 260400 | INFO | `organisatie_oin`, `approved_by` |
-| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | `organisatie_oin`, `deactivated_by` |
-| `CLIENT_REGISTERED` | 260402 | INFO | `handelende_oin`, `organisatie_oin`, `scopes` |
-| `CLIENT_WITHDRAWN` | 260403 | WARNING | `handelende_oin`, `deactivated_by` |
-| `SCOPES_CHANGED` | 260404 | WARNING | `organisatie_oin`, `handelende_oin`, `changed_by` |
+| `ORGANIZATION_REGISTERED` | 260400 | INFO | *none* |
+| `ORGANIZATION_WITHDRAWN` | 260401 | WARNING | *none* |
+| `CLIENT_REGISTERED` | 260402 | INFO | `scopes` |
+| `CLIENT_WITHDRAWN` | 260403 | WARNING | *none* |
+| `SCOPES_CHANGED` | 260404 | WARNING | *none* |
 | `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `error_reason` |
 | `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |
