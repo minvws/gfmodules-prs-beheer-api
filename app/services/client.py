@@ -21,6 +21,7 @@ from app.exceptions import (
     PersonalIdTypesNotInOrganizationError,
     ScopesNotInOrganizationError,
 )
+from app.logging import audit
 from app.logging.context import set_client_log_context, set_organization_log_context
 from app.models.client import (
     Client,
@@ -113,7 +114,10 @@ class ClientService:
             )
             entity = repo.add_one(entity)
             session.commit()
-            return Client(**entity.to_dict())
+            client = Client(**entity.to_dict())
+            common_names = [certificate.domain for certificate in certificates]
+        audit.client_registered(client, common_names)
+        return client
 
     def get_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
@@ -159,6 +163,7 @@ class ClientService:
             if repo.name_exists(organization_id, update.name, exclude_id=client_entity.id):
                 logger.debug("Client name already in use by another client")
                 raise ClientNameAlreadyExistsError()
+            before = Client(**client_entity.to_dict())
             now = datetime.now(UTC)
             client_entity.updated_at = now
             client_entity.name = update.name
@@ -181,7 +186,11 @@ class ClientService:
                 if rpit.name in update.request_personal_id_types
             ]
             client_entity.request_personal_id_types = updated
-            return Client(**client_entity.to_dict())
+            session.flush()
+            after = Client(**client_entity.to_dict())
+            common_names = [certificate.domain for certificate in certificates]
+        audit.client_updated(before, after, common_names)
+        return after
 
     def delete_one(self, id: UUID, organization_id: UUID) -> Client:
         with self.db.get_db_session() as session:
@@ -195,7 +204,9 @@ class ClientService:
                 return Client(**client_entity.to_dict())
             client_entity.deleted_at = client_entity.updated_at = datetime.now(tz=UTC)
             session.commit()
-            return Client(**client_entity.to_dict())
+            client = Client(**client_entity.to_dict())
+        audit.client_withdrawn()
+        return client
 
     def resolve(self, resolve_request: ResolveRequest) -> ResolveResponse:
         with self.db.get_db_session() as session:
