@@ -40,9 +40,11 @@ The request context also holds these, but an event carries them only on the stre
 | `CLIENT_WITHDRAWN` | 260403 | WARNING | `represented_organization_name`, `client_name` |
 | `SCOPES_CHANGED` | 260404 | WARNING | `represented_organization_name`, `client_name`, `changed_scopes` |
 | `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `represented_organization_name`, `client_name`, `error_reason` |
+| `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status`, `error_detail` |
 | `SYS_APP_STARTED` | 270401 | INFO | `version`, `config_path` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason`, `last_exception_type` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason`, `last_exception_type` |
+| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `error_type`, `retry_attempt`, `backoff_seconds` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method`, `represented_organization_name`, `client_name` |
 | `SYS_MISSING_CORRELATION_ID` | 270428 | ERROR | `endpoint`, `method` |
 | `ACCESS_REQUEST` | 100 | INFO | `endpoint`, `method`, `status_code`, `status_code_missing`, `duration_ms`, `body`, `body_truncated`, `represented_organization_name`, `client_name` |
@@ -57,19 +59,8 @@ The request context also holds these, but an event carries them only on the stre
 | `CLIENT_WITHDRAWN` | 260403 | WARNING | *none* |
 | `SCOPES_CHANGED` | 260404 | WARNING | *none* |
 | `ONBOARDING_VALIDATION_FAILED` | 260405 | WARNING | `error_reason` |
+| `HEALTH_UNHEALTHY` | 270400 | ERROR | `component`, `status` |
 | `SYS_APP_STOPPED` | 270402 | INFO | `shutdown_reason` |
 | `SYS_APP_CRASHED` | 270402 | CRITICAL | `shutdown_reason` |
+| `SYS_DB_CONNECTION_FAILED` | 270403 | ERROR | `error_type` |
 | `SYS_UNHANDLED_EXCEPTION` | 270404 | ERROR | `exception_type`, `endpoint`, `method` |
-
-## Access event ids per route
-
-`ACCESS_REQUEST` carries these ids instead of its own on these routes.
-
-| Method | Route | Id |
-| --- | --- | --- |
-| POST | `/organizations` | 260700 |
-| PUT | `/organizations/{id}` | 260701 |
-| DELETE | `/organizations/{id}` | 260702 |
-| POST | `/organizations/{organization_id}/clients` | 260703 |
-| PUT | `/organizations/{organization_id}/clients/{id}` | 260704 |
-| DELETE | `/organizations/{organization_id}/clients/{id}` | 260705 |
