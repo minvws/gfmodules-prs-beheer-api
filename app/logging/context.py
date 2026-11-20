@@ -27,7 +27,7 @@ CONTEXT_FIELDS: tuple[ContextField, ...] = (
 NAMES: tuple[str, ...] = (REPRESENTED_ORGANIZATION_NAME.name, CLIENT_NAME.name)
 
 
-def organization_in_context(identifier: Oin, name: str) -> None:
+def set_organization_log_context(identifier: Oin, name: str) -> None:
     set_context(
         {
             REPRESENTED_ORGANIZATION_IDENTIFIER.name: str(identifier),
@@ -36,7 +36,7 @@ def organization_in_context(identifier: Oin, name: str) -> None:
     )
 
 
-def client_in_context(name: str, certificates: Iterable["CertificateEntity"]) -> None:
+def set_client_log_context(name: str, certificates: Iterable["CertificateEntity"]) -> None:
     identifiers = sorted(
         {certificate.organization_identifier for certificate in certificates if certificate.deleted_at is None}
     )

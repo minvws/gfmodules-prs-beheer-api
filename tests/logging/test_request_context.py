@@ -18,7 +18,7 @@ from app.logging.context import (
     CONTEXT_FIELDS,
     REPRESENTED_ORGANIZATION_IDENTIFIER,
     REPRESENTED_ORGANIZATION_NAME,
-    organization_in_context,
+    set_organization_log_context,
 )
 from app.models.certificate import CertificateFields
 from app.routers.client import router as client_router
@@ -96,7 +96,7 @@ def test_names_stay_off_siem() -> None:
     service = MagicMock(spec=OrganizationService)
 
     def fail(_: Any) -> None:
-        organization_in_context(TEST_OIN, TEST_ORG_NAME)
+        set_organization_log_context(TEST_OIN, TEST_ORG_NAME)
         raise RuntimeError
 
     service.get_one.side_effect = fail
