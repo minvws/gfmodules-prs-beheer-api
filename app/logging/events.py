@@ -1,6 +1,9 @@
 import logging
+from typing import ClassVar
 
-from gfmodules.logging import DefaultEventCatalogue, LogEvent, LoggingStreams
+from gfmodules.logging import ContextField, DefaultEventCatalogue, LogEvent, LoggingStreams
+
+from app.logging.context import CONTEXT_FIELDS, NAMES
 
 _APP = LoggingStreams.APP
 _SIEM = LoggingStreams.SIEM
@@ -84,5 +87,9 @@ class Log(_Base):
         (_APP, _SIEM),
         {_APP: ("error_type", "retry_attempt", "backoff_seconds"), _SIEM: ("error_type",)},
     )
-    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404")  # PRS-SYS-004
+    SYS_UNHANDLED_EXCEPTION = _Base.SYS_UNHANDLED_EXCEPTION.with_id("270404").add_fields({_APP: NAMES})
     SYS_MISSING_CORRELATION_ID = _Base.SYS_MISSING_CORRELATION_ID.with_id("270428")
+
+    ACCESS_REQUEST = _Base.ACCESS_REQUEST.add_fields({_APP: NAMES})
+
+    context_fields: ClassVar[tuple[ContextField, ...]] = CONTEXT_FIELDS
