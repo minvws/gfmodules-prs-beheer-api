@@ -15,7 +15,7 @@ from app.exceptions import (
     ScopesNotFoundError,
 )
 from app.logging import audit
-from app.logging.context import organization_in_context
+from app.logging.context import set_organization_log_context
 from app.models.oin import Oin
 from app.models.organization import Organization, OrganizationCreate, OrganizationUpdate
 from app.utils.datetime import now_utc
@@ -61,7 +61,7 @@ class OrganizationService:
                 )
             )
             session.flush()
-            organization_in_context(entity.external_id, entity.name)
+            set_organization_log_context(entity.external_id, entity.name)
             organization = Organization(**entity.to_dict())
         audit.organization_registered(organization)
         return organization
@@ -72,7 +72,7 @@ class OrganizationService:
             entity = repo.get_one(id)
             if not entity:
                 raise OrganizationNotFoundError()
-            organization_in_context(entity.external_id, entity.name)
+            set_organization_log_context(entity.external_id, entity.name)
             return Organization(**entity.to_dict())
 
     def get_many(
@@ -97,7 +97,7 @@ class OrganizationService:
                 logger.debug("Organization not found for update id=%s", id)
                 raise OrganizationNotFoundError()
             before = Organization(**organization_entity.to_dict())
-            organization_in_context(organization_entity.external_id, organization_entity.name)
+            set_organization_log_context(organization_entity.external_id, organization_entity.name)
             if not organization_entity.deleted_at and organization_update.deleted:
                 self._assert_no_active_clients(organization_entity)
             now = datetime.now(UTC)
@@ -125,7 +125,7 @@ class OrganizationService:
             organization_entity.receive_personal_id_types = list(receive_personal_id_types)
             organization_entity.request_personal_id_types = list(request_personal_id_types)
 
-            organization_in_context(organization_entity.external_id, organization_entity.name)
+            set_organization_log_context(organization_entity.external_id, organization_entity.name)
             after = Organization(**organization_entity.to_dict())
         audit.organization_updated(before, after)
         return after
@@ -137,7 +137,7 @@ class OrganizationService:
             if not entity:
                 logger.debug("Organization not found for update id=%s", id)
                 raise OrganizationNotFoundError()
-            organization_in_context(entity.external_id, entity.name)
+            set_organization_log_context(entity.external_id, entity.name)
             if entity.deleted_at is not None:
                 return Organization(**entity.to_dict())
             self._assert_no_active_clients(entity)

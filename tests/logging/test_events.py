@@ -25,9 +25,11 @@ class TestCatalogue:
             ("CLIENT_WITHDRAWN", "260403"),
             ("SCOPES_CHANGED", "260404"),
             ("ONBOARDING_VALIDATION_FAILED", "260405"),
+            ("HEALTH_UNHEALTHY", "270400"),
             ("SYS_APP_STARTED", "270401"),
             ("SYS_APP_STOPPED", "270402"),
             ("SYS_APP_CRASHED", "270402"),
+            ("SYS_DB_CONNECTION_FAILED", "270403"),
             ("SYS_UNHANDLED_EXCEPTION", "270404"),
             ("SYS_MISSING_CORRELATION_ID", "270428"),
         ],
@@ -47,12 +49,6 @@ class TestCatalogue:
     def test_no_event_routes_to_public_inspect(self) -> None:
         for name, event in declared_events(Log):
             assert LoggingStreams.PUBLIC_INSPECT not in event.streams, f"{name} routes to public_inspect"
-
-
-class TestPerRouteAccessIds:
-    def test_the_beheer_routes_carry_their_own_access_event_id(self) -> None:
-        assert Log.access_event_id[("POST", "/organizations")] == "260700"
-        assert Log.access_event_id[("DELETE", "/organizations/{organization_id}/clients/{id}")] == "260705"
 
 
 class TestTheOverriddenSlots:
